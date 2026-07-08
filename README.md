@@ -1,7 +1,11 @@
 # cms-migration-kit(CMS移行キット)
 
 動的CMSのサイトを、静的配信(Cloudflare Pages)+自営スタックへ移行する
-ためのツール一式。設計は [DESIGN.md](DESIGN.md) が正。
+ためのツール一式。ねらいは **Microsoft 365・業務システム・CMS という
+三つの閉じた世界からの開放**——一つの開いた土台(git・SQL・メール・
+OnlyOffice・静的公開)に置き換え、公開標準(Markdown/YAML/SQL/Python)で
+繋ぐことで、この仕組み自体からも出られる形にする。
+設計は [DESIGN.md](DESIGN.md) が正。
 
 - 取り込み(ingest)→ 分類(classify)→ Markdown化(convert)→
   生成(build)→ 配信(publish)のパイプライン
@@ -16,11 +20,12 @@ source .venv/bin/activate
 ```
 
 cf-publish は同梱(vendor/。PyPI 公開後は通常の `pip install cf-publish` に
-切り替える)。日本語 Markdown の改行・強調を良くする mdit-py-cjk-friendly が
-あれば自動で使う(無くても動く):
+切り替える)。日本語 Markdown の改行・強調を良くする
+[mdit-py-cjk-friendly](https://github.com/aiseed-dev/mdit-py-cjk-friendly)
+があれば自動で使う(無くても動く):
 
 ```bash
-pip install mdit-py-cjk-friendly
+pip install git+https://github.com/aiseed-dev/mdit-py-cjk-friendly
 ```
 
 ## 使い方

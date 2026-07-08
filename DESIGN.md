@@ -273,11 +273,14 @@ OnlyOffice Docs(Document Server)は保管・ユーザー管理を持たない編
 
 ```
 sites/<name>/
-  site.yaml     サイト設定(base_url・分類ルール・担当→振り分け表)
-  rules.py      サイト固有の抽出ルール(記事/一覧/表)
+  site.yaml     サイト設定(base_url・分類・担当→振り分け表・様式定義)
+  rules.py      サイト固有の抽出ルール(記事/一覧。任意)
   source/       元データ(機関提供 or 取り込んだ生HTML: raw/)
-  content/      記事 .md(編集の正)
+  content/      記事 .md(編集の正。convert は既存を上書きしない)
   data/         構成・反復データ .yaml
+  templates/    テンプレートの上書き(任意)
+  public/       そのまま配信するファイル(favicon・_redirects 等。任意)
+  forms-out/    生成した様式 xlsx(公開サイトには置かない)
   dist/         生成物(配信対象)
 ```
 
@@ -533,12 +536,15 @@ Excel(表計算を"アプリ本体"にする使い方)**。移行後は表計算
 
 ```
 cms-migration-kit/
-  src/cmsmig/     ingest(取り込み)/ classify(分類)/ convert(MD・YAML化)/
-                  build(生成)/ publish(cf-publish 呼び出し)/
-                  inquiry(様式生成・受信振り分け)
+  src/cmsmig/          cli / site(設定)/ ingest(取り込み)/
+                       classify(分類)/ convert(MD化)/ build(生成)/
+                       publish(cf-publish 呼び出し)/ rules(既定の抽出ルール)
+    inquiry/           forms(様式生成)/ parse(読み取り)/
+                       mailin(受信振り分け)/ mail(送信)
+    templates/         既定テンプレート(サイトの templates/ で上書き可)
   vendor/cf-publish/   Cloudflare 配信(同梱)
-  templates/           既定テンプレート(サイトで上書き可)
-  sites/<name>/        上記コンテンツ設計のとおり
+  sites/<name>/        上記コンテンツ設計のとおり(example = 出力例)
+  tests/               pytest(様式は生成→記入→読取のラウンドトリップ)
 ```
 
 - 技術: Python / git / マークダウン・YAML / Jinja2 / Cloudflare Pages

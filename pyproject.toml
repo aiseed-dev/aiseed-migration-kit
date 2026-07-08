@@ -19,6 +19,9 @@ dependencies = [
     "openpyxl>=3.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/aiseed-dev/cms-migration-kit"
+
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.4"]
 publish = ["cf-publish>=0.2"]
