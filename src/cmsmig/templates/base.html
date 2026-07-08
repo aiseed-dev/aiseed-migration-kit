@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="{{ site.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site.title }}{% endblock %}</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="site">
+  <a class="home" href="/">{{ site.title }}</a>
+  <nav>
+    {%- for key, label in site.categories.items() %}
+    <a href="/{{ key }}/">{{ label }}</a>
+    {%- endfor %}
+  </nav>
+</header>
+<main>
+{% block main %}{% endblock %}
+</main>
+<footer class="site">
+  <p>© {{ site.title }}</p>
+</footer>
+</body>
+</html>

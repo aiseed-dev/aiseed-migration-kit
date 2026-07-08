@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block main %}
+{% if data.top and data.top.intro %}
+<p class="intro">{{ data.top.intro }}</p>
+{% endif %}
+{%- for key, label in site.categories.items() %}
+{%- if by_cat.get(key) %}
+<section>
+  <h2><a href="/{{ key }}/">{{ label }}</a></h2>
+  <ul class="items">
+    {%- for p in by_cat[key][:5] %}
+    <li>
+      {% if p.date %}<span class="date">{{ p.date | jdate }}</span>{% endif %}
+      <a href="{{ p.url }}">{{ p.title }}</a>
+    </li>
+    {%- endfor %}
+  </ul>
+</section>
+{%- endif %}
+{%- endfor %}
+{% if data.top and data.top.contact %}
+<section>
+  <h2>お問い合わせ</h2>
+  <p>{{ data.top.contact }}</p>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,51 @@
+/* キット既定のスタイル。Webフォントは使わない(システムフォントで組む) */
+:root {
+  --ink: #222;
+  --sub: #666;
+  --line: #ddd;
+  --accent: #14532d;
+  --bg: #fff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: system-ui, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic UI",
+    "Meiryo", sans-serif;
+  line-height: 1.8;
+}
+header.site, main, footer.site {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+header.site {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  padding-top: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--accent);
+}
+header.site .home {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+}
+header.site nav { display: flex; gap: 1rem; }
+header.site nav a { color: var(--ink); text-decoration: none; }
+header.site nav a:hover { text-decoration: underline; }
+main { padding-top: 1.5rem; padding-bottom: 3rem; }
+h1 { font-size: 1.5rem; line-height: 1.4; }
+h2 { font-size: 1.2rem; border-left: 4px solid var(--accent); padding-left: 0.5rem; }
+a { color: #1d4ed8; }
+.date { color: var(--sub); font-size: 0.9rem; margin-right: 0.75rem; }
+ul.items { list-style: none; padding: 0; }
+ul.items li { padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+table { border-collapse: collapse; }
+th, td { border: 1px solid var(--line); padding: 0.4rem 0.6rem; }
+img { max-width: 100%; height: auto; }
+footer.site { border-top: 1px solid var(--line); color: var(--sub); font-size: 0.9rem; }

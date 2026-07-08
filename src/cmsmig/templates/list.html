@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ category_label }} — {{ site.title }}{% endblock %}
+{% block main %}
+<h1>{{ category_label }}</h1>
+<ul class="items">
+  {%- for p in items %}
+  <li>
+    {% if p.date %}<span class="date">{{ p.date | jdate }}</span>{% endif %}
+    <a href="{{ p.url }}">{{ p.title }}</a>
+  </li>
+  {%- endfor %}
+</ul>
+{% endblock %}

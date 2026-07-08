@@ -1,0 +1,151 @@
+"""cmsmig コマンド(パイプラインの入口)。
+
+    cmsmig new sites/<name>            サイトの雛形を作る
+    cmsmig ingest <site> <入力...>     元データを source/raw/ へ取り込む
+    cmsmig classify <site>             記事/一覧に分類(classified.yaml)
+    cmsmig convert <site> [--force]    記事を content/*.md へ機械変換
+    cmsmig build <site>                dist/ を生成
+    cmsmig publish <site> [--dry-run]  Cloudflare Pages へ配信
+    cmsmig forms <site>                申込様式 xlsx を forms-out/ へ生成
+    cmsmig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
+    cmsmig mailin <site> [--once]      受付メールの振り分け(IMAP)
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+from cmsmig import build as build_mod
+from cmsmig import classify as classify_mod
+from cmsmig import convert as convert_mod
+from cmsmig import ingest as ingest_mod
+from cmsmig import publish as publish_mod
+from cmsmig import site as site_mod
+
+NEW_SITE_YAML = """\
+title: サイト名(機関名)
+# base_url: https://example.pages.dev
+# project: example        # Cloudflare Pages のプロジェクト名(既定はサイト名)
+lang: ja
+
+categories:
+  news: お知らせ
+
+# 問い合わせを使うときに設定する(様式・受付アドレスは公開サイトに載せない)
+# inquiry:
+#   address: uketsuke@example.jp
+#   staff:
+#     - {key: general, label: 総合窓口}
+#   forms:
+#     - key: contact
+#       label: お問い合わせ
+#       fields:
+#         - {key: company, label: ご所属, required: true, example: 株式会社○○}
+#         - {key: person, label: お名前, required: true, example: 山田 太郎}
+#         - {key: email, label: メールアドレス, required: true}
+#         - {key: message, label: ご用件, required: true}
+"""
+
+
+def main(argv: list[str] | None = None) -> None:
+    p = argparse.ArgumentParser(prog="cmsmig", description=__doc__)
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    sp = sub.add_parser("new", help="サイトの雛形を作る")
+    sp.add_argument("site")
+
+    sp = sub.add_parser("ingest", help="元データを source/raw/ へ取り込む")
+    sp.add_argument("site")
+    sp.add_argument("inputs", nargs="+")
+
+    sp = sub.add_parser("classify", help="記事/一覧に分類する")
+    sp.add_argument("site")
+
+    sp = sub.add_parser("convert", help="記事を content/*.md へ機械変換する")
+    sp.add_argument("site")
+    sp.add_argument("--force", action="store_true", help="既存の .md も上書きする")
+
+    sp = sub.add_parser("build", help="dist/ を生成する")
+    sp.add_argument("site")
+
+    sp = sub.add_parser("publish", help="Cloudflare Pages へ配信する")
+    sp.add_argument("site")
+    sp.add_argument("--branch", default="main")
+    sp.add_argument("--dry-run", action="store_true")
+
+    sp = sub.add_parser("forms", help="申込様式 xlsx を forms-out/ へ生成する")
+    sp.add_argument("site")
+
+    sp = sub.add_parser("macro", help="様式マクロ(OnlyOffice JS)を出力する")
+    sp.add_argument("site")
+    sp.add_argument("form")
+
+    sp = sub.add_parser("mailin", help="受付メールを担当フォルダへ振り分ける")
+    sp.add_argument("site")
+    sp.add_argument("--once", action="store_true", help="1回だけさらって終了")
+
+    args = p.parse_args(argv)
+    try:
+        _run(args)
+    except (site_mod.SiteError, build_mod.BuildError, publish_mod.PublishError) as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        raise SystemExit(1) from None
+
+
+def _run(args: argparse.Namespace) -> None:
+    if args.cmd == "new":
+        root = Path(args.site)
+        if (root / "site.yaml").exists():
+            raise site_mod.SiteError(f"{root}/site.yaml は既にあります")
+        for d in ("content", "data", "public"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "site.yaml").write_text(NEW_SITE_YAML, encoding="utf-8")
+        print(f"作成しました: {root}(site.yaml を編集してください)")
+        return
+
+    site = site_mod.load(args.site)
+
+    if args.cmd == "ingest":
+        n = ingest_mod.ingest(site, [Path(x) for x in args.inputs])
+        print(f"取り込み {n} 件 → {site.raw}")
+    elif args.cmd == "classify":
+        result = classify_mod.classify(site)
+        print(f"分類 {classify_mod.counts(result)} → {site.source / '(classified.yaml)'}")
+    elif args.cmd == "convert":
+        written, skipped = convert_mod.convert(site, force=args.force)
+        note = "(--force で上書き)" if skipped and not args.force else ""
+        print(f"変換 {written} 件 / 既存を保護 {skipped} 件{note} → {site.content}")
+    elif args.cmd == "build":
+        n = build_mod.build(site)
+        print(f"生成 {n} ページ → {site.dist}")
+    elif args.cmd == "publish":
+        publish_mod.publish(site, branch=args.branch, dry_run=args.dry_run)
+    elif args.cmd == "forms":
+        _forms(site)
+    elif args.cmd == "macro":
+        from cmsmig.inquiry import forms as forms_mod
+
+        print(forms_mod.macro_js(site, site.form(args.form)))
+    elif args.cmd == "mailin":
+        from cmsmig.inquiry import mailin
+
+        mailin.run(site, once=args.once)
+
+
+def _forms(site: site_mod.Site) -> None:
+    from cmsmig.inquiry import forms as forms_mod
+
+    addr = str((site.cfg.get("inquiry") or {}).get("address") or "")
+    if not addr:
+        raise site_mod.SiteError("site.yaml の inquiry.address(受付アドレス)が未設定です")
+    if not site.staff:
+        raise site_mod.SiteError("site.yaml の inquiry.staff(担当)が未設定です")
+    if not site.forms:
+        raise site_mod.SiteError("site.yaml の inquiry.forms(様式)が未設定です")
+    site.forms_out.mkdir(parents=True, exist_ok=True)
+    for form in site.forms:
+        wb = forms_mod.build(site, form, addr)
+        out = site.forms_out / f"{form.key}.xlsx"
+        wb.save(out)
+        print(f"様式を生成: {out}({form.label})")
+    print("注意: 様式と受付アドレスは公開サイトに置かない(個別に渡す)")
