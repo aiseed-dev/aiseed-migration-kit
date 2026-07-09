@@ -51,6 +51,7 @@ Microsoft 365 との対応:
 | Word/Excel・Office 文書 | OnlyOffice |
 | OneDrive / SharePoint(文書共有) | 自作文書ホスト + OnlyOffice Docs(§2) |
 | Teams(会議・ウェビナー) | Jitsi / BigBlueButton |
+| Teams(チャット) | **対象外**——効率が悪く、決定・資料が流れて消える。連絡=メール / 議論=Forgejo(issue)/ 会議=Jitsi で足りる |
 | Bookings(予約) | Cal.com |
 | Copilot(AI) | ローカルAI(Command A+ / North Mini Code) |
 | VBA / Power Automate(自動化) | 外部Python + 内部JavaScript |
@@ -59,7 +60,7 @@ Microsoft 365 との対応:
 
 部品の選定は自立編スタック(https://aiseed.dev/ai-native-ways/software/)に
 よる。会議・ウェビナー・予約は必要になった機関で足す(本キットの必須部品では
-ない)。Teams のチャット相当は本キットの範囲外(必要時に選定する)。
+ない)。
 
 いずれも「ベンダーの檻から手元へ」——所有・限界費用ゼロ・データを建物の中に、
 という同じ原則の適用先が違うだけである。
