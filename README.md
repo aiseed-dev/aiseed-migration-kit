@@ -1,8 +1,8 @@
 # aiseed-migration-kit
 
 組織のITを、AI とともに開いた自営スタックへ移行するためのツール一式。
-ねらいは **Microsoft 365・業務システム・CMS という三つの閉じた世界からの
-開放**——一つの開いた土台(git・SQL・メール・OnlyOffice・静的公開)に
+ねらいは **Microsoft 365 + Azure・業務システム・CMS という三つの閉じた
+世界からの開放**——一つの開いた土台(git・SQL・メール・OnlyOffice・静的公開)に
 置き換え、公開標準(Markdown/YAML/SQL/Python)で繋ぐことで、この仕組み
 自体からも出られる形にする。設計は [DESIGN.md](DESIGN.md) が正。
 
