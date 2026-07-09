@@ -13,9 +13,9 @@ from pathlib import Path
 import yaml
 from markdownify import markdownify
 
-from cmsmig import classify as classify_mod
-from cmsmig.rules import Extracted, SourceDoc
-from cmsmig.site import Site
+from amig import classify as classify_mod
+from amig.rules import Extracted, SourceDoc
+from amig.site import Site
 
 
 def convert(site: Site, force: bool = False) -> tuple[int, int]:
@@ -24,7 +24,7 @@ def convert(site: Site, force: bool = False) -> tuple[int, int]:
     rules = site.rules()
     extract = getattr(rules, "extract", None)
     if extract is None:
-        from cmsmig import rules as default
+        from amig import rules as default
 
         extract = default.extract
     written = skipped = 0

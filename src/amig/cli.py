@@ -1,26 +1,26 @@
-"""cmsmig コマンド(パイプラインの入口)。
+"""amig コマンド(パイプラインの入口)。
 
-    cmsmig new sites/<name>            サイトの雛形を作る
-    cmsmig ingest <site> <入力...>     元データを source/raw/ へ取り込む
-    cmsmig classify <site>             記事/一覧に分類(classified.yaml)
-    cmsmig convert <site> [--force]    記事を content/*.md へ機械変換
-    cmsmig build <site>                dist/ を生成
-    cmsmig publish <site> [--dry-run]  Cloudflare Pages へ配信
-    cmsmig forms <site>                申込様式 xlsx を forms-out/ へ生成
-    cmsmig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
-    cmsmig mailin <site> [--once]      受付メールの振り分け(IMAP)
+    amig new sites/<name>            サイトの雛形を作る
+    amig ingest <site> <入力...>     元データを source/raw/ へ取り込む
+    amig classify <site>             記事/一覧に分類(classified.yaml)
+    amig convert <site> [--force]    記事を content/*.md へ機械変換
+    amig build <site>                dist/ を生成
+    amig publish <site> [--dry-run]  Cloudflare Pages へ配信
+    amig forms <site>                申込様式 xlsx を forms-out/ へ生成
+    amig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
+    amig mailin <site> [--once]      受付メールの振り分け(IMAP)
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from cmsmig import build as build_mod
-from cmsmig import classify as classify_mod
-from cmsmig import convert as convert_mod
-from cmsmig import ingest as ingest_mod
-from cmsmig import publish as publish_mod
-from cmsmig import site as site_mod
+from amig import build as build_mod
+from amig import classify as classify_mod
+from amig import convert as convert_mod
+from amig import ingest as ingest_mod
+from amig import publish as publish_mod
+from amig import site as site_mod
 
 NEW_SITE_YAML = """\
 title: サイト名(機関名)
@@ -48,7 +48,7 @@ categories:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="cmsmig", description=__doc__)
+    p = argparse.ArgumentParser(prog="amig", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("new", help="サイトの雛形を作る")
@@ -123,17 +123,17 @@ def _run(args: argparse.Namespace) -> None:
     elif args.cmd == "forms":
         _forms(site)
     elif args.cmd == "macro":
-        from cmsmig.inquiry import forms as forms_mod
+        from amig.inquiry import forms as forms_mod
 
         print(forms_mod.macro_js(site, site.form(args.form)))
     elif args.cmd == "mailin":
-        from cmsmig.inquiry import mailin
+        from amig.inquiry import mailin
 
         mailin.run(site, once=args.once)
 
 
 def _forms(site: site_mod.Site) -> None:
-    from cmsmig.inquiry import forms as forms_mod
+    from amig.inquiry import forms as forms_mod
 
     addr = str((site.cfg.get("inquiry") or {}).get("address") or "")
     if not addr:

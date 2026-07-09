@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from cmsmig import publish as publish_mod
+from amig import publish as publish_mod
 
 
 def test_empty_dist(tmp_site):

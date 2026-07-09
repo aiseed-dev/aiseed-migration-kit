@@ -16,7 +16,7 @@ from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
-from cmsmig.site import FormDef, Site
+from amig.site import FormDef, Site
 
 FORM_VER = 1
 SHEET = "記入シート"
@@ -181,7 +181,7 @@ def macro_js(site: Site, form: FormDef) -> str:
     本文の生成自体は A 列の数式が担う(全表計算ソフト共通)。マクロは
     OnlyOffice 利用者向けの補助で、未記入チェックのうえ C 列の1セルに
     本文をまとめて一括コピーしやすくする。
-    出力: `cmsmig macro <site> <form>`。チェック定義はサーバー側の検証
+    出力: `amig macro <site> <form>`。チェック定義はサーバー側の検証
     (parse)と同じ site.yaml から生成されるため、様式を変えたら再生成する。
     """
     n = names(form)
@@ -192,7 +192,7 @@ def macro_js(site: Site, form: FormDef) -> str:
     )
     return f"""// 様式マクロ({form.label}): 未記入チェックのうえ、送信用テキストを
 // 「{TEXT_SHEET}」シートに書き出す。OnlyOffice(Desktop / Docs)専用。
-// このファイルは自動生成(cmsmig macro)——手で直さず、site.yaml を直して再生成する
+// このファイルは自動生成(amig macro)——手で直さず、site.yaml を直して再生成する
 // チェック定義はサーバー側の検証(parse)と同じ site.yaml から生成される
 (function () {{
   var src = Api.GetSheet("{SHEET}");

@@ -6,7 +6,7 @@ cf-publish は同梱(vendor/cf-publish。PyPI 公開までの暫定)。未イン
 実際の公開実行は運用判断で行う(勝手に配信しない)。
 """
 
-from cmsmig.site import Site
+from amig.site import Site
 
 
 class PublishError(Exception):
@@ -30,7 +30,7 @@ def publish(
             "  pip install vendor/cf-publish"
         ) from None
     if not site.dist.exists() or not any(site.dist.iterdir()):
-        raise PublishError("dist/ が空です。先に `cmsmig build` を実行してください")
+        raise PublishError("dist/ が空です。先に `amig build` を実行してください")
     project = str(site.cfg.get("project") or site.name)
     args = [str(site.dist), "--project", project, "--branch", branch]
     if dry_run:

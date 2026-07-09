@@ -2,7 +2,7 @@
 
 import pytest
 
-from cmsmig import build as build_mod
+from amig import build as build_mod
 
 
 def test_build_example(example):

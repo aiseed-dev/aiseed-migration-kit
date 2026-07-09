@@ -24,8 +24,8 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import parseaddr
 
-from cmsmig.inquiry import mail, parse
-from cmsmig.site import Site
+from amig.inquiry import mail, parse
+from amig.site import Site
 
 log = logging.getLogger(__name__)
 
@@ -60,19 +60,19 @@ class Cfg:
 
         env = os.environ.get
         return cls(
-            imap_host=need("CMSMIG_IMAP_HOST"),
-            imap_user=need("CMSMIG_IMAP_USER"),
-            imap_pass=need("CMSMIG_IMAP_PASS"),
-            submit_addr=need("CMSMIG_SUBMIT_ADDR"),
-            imap_port=int(env("CMSMIG_IMAP_PORT", "993")),
-            smtp_host=env("CMSMIG_SMTP_HOST", ""),
-            smtp_port=int(env("CMSMIG_SMTP_PORT", "587")),
-            smtp_user=env("CMSMIG_SMTP_USER", ""),
-            smtp_pass=env("CMSMIG_SMTP_PASS", ""),
-            smtp_starttls=env("CMSMIG_SMTP_STARTTLS", "1") != "0",
-            from_name=env("CMSMIG_FROM_NAME", ""),
-            pending=env("CMSMIG_PENDING", PENDING),
-            poll_sec=int(env("CMSMIG_POLL_SEC", "120")),
+            imap_host=need("AMIG_IMAP_HOST"),
+            imap_user=need("AMIG_IMAP_USER"),
+            imap_pass=need("AMIG_IMAP_PASS"),
+            submit_addr=need("AMIG_SUBMIT_ADDR"),
+            imap_port=int(env("AMIG_IMAP_PORT", "993")),
+            smtp_host=env("AMIG_SMTP_HOST", ""),
+            smtp_port=int(env("AMIG_SMTP_PORT", "587")),
+            smtp_user=env("AMIG_SMTP_USER", ""),
+            smtp_pass=env("AMIG_SMTP_PASS", ""),
+            smtp_starttls=env("AMIG_SMTP_STARTTLS", "1") != "0",
+            from_name=env("AMIG_FROM_NAME", ""),
+            pending=env("AMIG_PENDING", PENDING),
+            poll_sec=int(env("AMIG_POLL_SEC", "120")),
         )
 
 

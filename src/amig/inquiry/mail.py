@@ -10,10 +10,10 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from typing import TYPE_CHECKING, Protocol
 
-from cmsmig.inquiry.parse import Inquiry
+from amig.inquiry.parse import Inquiry
 
 if TYPE_CHECKING:
-    from cmsmig.inquiry.mailin import Cfg
+    from amig.inquiry.mailin import Cfg
 
 
 class Mailer(Protocol):

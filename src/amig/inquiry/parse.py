@@ -19,8 +19,8 @@ from typing import BinaryIO
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
 
-from cmsmig.inquiry import forms
-from cmsmig.site import FormDef, Site, Staff
+from amig.inquiry import forms
+from amig.site import FormDef, Site, Staff
 
 
 @dataclass(frozen=True)

@@ -23,7 +23,7 @@ import yaml
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 from markdown_it import MarkdownIt
 
-from cmsmig.site import Site
+from amig.site import Site
 
 
 def _markdown() -> MarkdownIt:
@@ -119,7 +119,7 @@ def _env(site: Site) -> Environment:
     loaders = []
     if site.templates.exists():
         loaders.append(FileSystemLoader(site.templates))
-    loaders.append(FileSystemLoader(str(files("cmsmig") / "templates")))
+    loaders.append(FileSystemLoader(str(files("amig") / "templates")))
     env = Environment(loader=ChoiceLoader(loaders), autoescape=True)
     env.filters["jdate"] = jdate
     return env
@@ -156,7 +156,7 @@ def build(site: Site) -> int:
     site.dist.mkdir(parents=True)
 
     # キット既定の静的ファイル(style.css)→ サイト public/ が上書き
-    static = files("cmsmig") / "templates" / "static"
+    static = files("amig") / "templates" / "static"
     for f in static.iterdir():
         if f.is_file():
             (site.dist / f.name).write_bytes(f.read_bytes())

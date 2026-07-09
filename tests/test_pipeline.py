@@ -3,10 +3,10 @@
 from datetime import date
 from pathlib import Path
 
-from cmsmig import classify as classify_mod
-from cmsmig import convert as convert_mod
-from cmsmig import ingest as ingest_mod
-from cmsmig import rules
+from amig import classify as classify_mod
+from amig import convert as convert_mod
+from amig import ingest as ingest_mod
+from amig import rules
 
 ARTICLE = """<html><head><title>設備更新のお知らせ | テスト機関</title></head>
 <body><nav><a href="/">ホーム</a><a href="/news/">お知らせ</a></nav>

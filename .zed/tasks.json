@@ -13,7 +13,7 @@
   },
   {
     "label": "build example",
-    "command": ".venv/bin/cmsmig build sites/example",
+    "command": ".venv/bin/amig build sites/example",
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false
   },
@@ -25,13 +25,13 @@
   },
   {
     "label": "forms example (様式xlsx生成)",
-    "command": ".venv/bin/cmsmig forms sites/example",
+    "command": ".venv/bin/amig forms sites/example",
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false
   },
   {
     "label": "publish example (dry-run)",
-    "command": ".venv/bin/cmsmig publish sites/example --dry-run",
+    "command": ".venv/bin/amig publish sites/example --dry-run",
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false
   }

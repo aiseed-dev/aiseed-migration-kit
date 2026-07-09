@@ -3,7 +3,7 @@
 import pytest
 import yaml
 
-from cmsmig import site as site_mod
+from amig import site as site_mod
 
 
 def test_example_loads(example):

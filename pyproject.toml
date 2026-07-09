@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cms-migration-kit"
+name = "aiseed-migration-kit"
 version = "0.1.0"
-description = "動的CMSを静的配信+自営スタックへ移行するキット(取り込み・変換・生成・配信・問い合わせ様式)"
+description = "組織のIT(Microsoft 365・業務システム・CMS)を開いた自営スタックへ移行するキット(取り込み・変換・生成・配信・問い合わせ様式)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-only" }
@@ -20,17 +20,17 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aiseed-dev/cms-migration-kit"
+Homepage = "https://github.com/aiseed-dev/aiseed-migration-kit"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.4"]
 publish = ["cf-publish>=0.2"]
 
 [project.scripts]
-cmsmig = "cmsmig.cli:main"
+amig = "amig.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cmsmig"]
+packages = ["src/amig"]
 
 [tool.ruff]
 line-length = 88

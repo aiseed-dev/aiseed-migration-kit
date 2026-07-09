@@ -2,13 +2,13 @@
 
 結果は source/classified.yaml に書く(人が見て直せる中間成果物。
 convert はこれを読む。無ければ convert がその場で分類する)。
-分類ロジックはサイトの rules.py(無ければ既定 cmsmig.rules)。
+分類ロジックはサイトの rules.py(無ければ既定 amig.rules)。
 """
 
 import yaml
 
-from cmsmig.rules import SourceDoc
-from cmsmig.site import Site
+from amig.rules import SourceDoc
+from amig.site import Site
 
 CLASSIFIED = "classified.yaml"
 
@@ -29,7 +29,7 @@ def classify(site: Site) -> dict[str, str]:
     rules = site.rules()
     fn = getattr(rules, "classify", None)
     if fn is None:
-        from cmsmig import rules as default
+        from amig import rules as default
 
         fn = default.classify
     result = {doc.rel: str(fn(doc)) for doc in docs(site)}

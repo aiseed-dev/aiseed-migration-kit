@@ -1,8 +1,9 @@
-# 設計書 — CMS からの移行(静的化+自営スタック)
+# 設計書 — 組織のIT移行(Microsoft 365・業務システム・CMS → 開いた自営スタック)
 
-動的CMS から、静的配信+自営スタック(共同編集・問い合わせ・業務)へ移行する
+組織のIT——Microsoft 365(文書・メール・会議)・業務システム・CMS(公開Web)
+——を、開いた自営スタック(静的配信・共同編集・問い合わせ・業務)へ移行する
 ための設計書。サーバー運用の担当者が構築・運用・引き継ぎに用いる。移行と
-生成のツール一式は cms-migration-kit(CMS移行キット。本リポジトリ)を使う。
+生成のツール一式は aiseed-migration-kit(本リポジトリ)を使う。
 
 ## 0. 設計の考え方(CMS の「仮」を本格にする)
 
@@ -535,8 +536,8 @@ Excel(表計算を"アプリ本体"にする使い方)**。移行後は表計算
 ## 12. リポジトリ・技術構成
 
 ```
-cms-migration-kit/
-  src/cmsmig/          cli / site(設定)/ ingest(取り込み)/
+aiseed-migration-kit/
+  src/amig/          cli / site(設定)/ ingest(取り込み)/
                        classify(分類)/ convert(MD化)/ build(生成)/
                        publish(cf-publish 呼び出し)/ rules(既定の抽出ルール)
     inquiry/           forms(様式生成)/ parse(読み取り)/

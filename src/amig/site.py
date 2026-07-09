@@ -2,7 +2,7 @@
 
 sites/<name>/
   site.yaml   サイト設定(このモジュールが読む)
-  rules.py    サイト固有の抽出ルール(無ければ既定 cmsmig.rules)
+  rules.py    サイト固有の抽出ルール(無ければ既定 amig.rules)
   source/     取り込んだ元データ(raw/・manifest.yaml・classified.yaml)
   content/    記事 .md(編集の正。convert は既存を上書きしない)
   data/       構成・反復データ .yaml
@@ -153,14 +153,14 @@ class Site:
         raise SiteError(f"様式「{key}」は site.yaml の inquiry.forms にありません")
 
     def rules(self) -> ModuleType:
-        """サイト固有 rules.py(無ければ既定の cmsmig.rules)。
+        """サイト固有 rules.py(無ければ既定の amig.rules)。
 
         rules.py は classify(doc)・extract(doc) の一方だけ定義してもよい
         (無い方は既定にフォールバックする。build 等が getattr で解決)。
         """
         path = self.root / "rules.py"
         if not path.exists():
-            from cmsmig import rules
+            from amig import rules
 
             return rules
         spec = importlib.util.spec_from_file_location(f"rules_{self.name}", path)

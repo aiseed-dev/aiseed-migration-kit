@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from cmsmig.site import Site
+from amig.site import Site
 
 
 def ingest(site: Site, inputs: list[Path]) -> int:

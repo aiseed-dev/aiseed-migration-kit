@@ -5,7 +5,7 @@ import io
 import pytest
 from openpyxl import load_workbook
 
-from cmsmig.inquiry import forms, parse
+from amig.inquiry import forms, parse
 
 FILLED = {
     "company": "株式会社○○製作所",

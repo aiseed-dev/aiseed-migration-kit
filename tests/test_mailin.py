@@ -2,7 +2,7 @@
 
 from email.message import EmailMessage
 
-from cmsmig.inquiry import mailin
+from amig.inquiry import mailin
 from tests.test_inquiry import _text, _xlsx
 
 

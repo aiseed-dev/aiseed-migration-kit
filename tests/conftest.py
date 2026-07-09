@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cmsmig import site as site_mod
+from amig import site as site_mod
 
 EXAMPLE = Path(__file__).parent.parent / "sites" / "example"
 
