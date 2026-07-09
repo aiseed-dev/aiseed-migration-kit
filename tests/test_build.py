@@ -46,11 +46,33 @@ def test_unclosed_frontmatter(tmp_site):
         build_mod.build(tmp_site)
 
 
-def test_public_passthrough(tmp_site):
+def _one_page(tmp_site):
     tmp_site.content.mkdir(parents=True)
     (tmp_site.content / "a.md").write_text(
         "---\ntitle: a\n---\n\nhon bun\n", encoding="utf-8"
     )
+
+
+def test_forms_published(tmp_site):
+    """forms-out/ の様式は build で dist/forms/ に公開される(§5)。"""
+    _one_page(tmp_site)
+    tmp_site.forms_out.mkdir(parents=True)
+    (tmp_site.forms_out / "contact.xlsx").write_bytes(b"dummy")
+    build_mod.build(tmp_site)
+    assert (tmp_site.dist / "forms" / "contact.xlsx").read_bytes() == b"dummy"
+
+
+def test_forms_not_published_when_disabled(tmp_site):
+    tmp_site.cfg["inquiry"]["publish_forms"] = False
+    _one_page(tmp_site)
+    tmp_site.forms_out.mkdir(parents=True)
+    (tmp_site.forms_out / "contact.xlsx").write_bytes(b"dummy")
+    build_mod.build(tmp_site)
+    assert not (tmp_site.dist / "forms").exists()
+
+
+def test_public_passthrough(tmp_site):
+    _one_page(tmp_site)
     tmp_site.public.mkdir(parents=True)
     (tmp_site.public / "_redirects").write_text("/old /a.html 301\n", encoding="utf-8")
     build_mod.build(tmp_site)

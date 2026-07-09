@@ -5,8 +5,9 @@
 ここの names() を参照する)。Excel の定義名にハイフンは使えないため、
 定義名のみアンダースコアを使う。
 
-様式・受付アドレスは公開サイトに置かない(受領メール・印刷物・電話で
-個別に渡す。DESIGN.md §5)。発行キーは埋め込まない。
+様式は公開サイトからダウンロードできる(build が dist/forms/ に載せる)。
+受付アドレスはページ本文に書かず、様式の中にだけ置く(ボット収集対策。
+DESIGN.md §5)。発行キーは埋め込まない。
 """
 
 from openpyxl import Workbook
@@ -82,7 +83,7 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
     """様式を組み立てる(1枚目=記入シート、2枚目=送信用テキスト、
     記入例は example のある様式のみ3枚目)。
 
-    submit_addr は受付アドレス。様式にだけ書き、公開サイトには載せない。
+    submit_addr は受付アドレス。様式にだけ書き、公開ページの本文には載せない。
     """
     note = (
         f"記入後、「{TEXT_SHEET}」シートの本文をコピーして {submit_addr} へ"

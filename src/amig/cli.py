@@ -31,7 +31,8 @@ lang: ja
 categories:
   news: お知らせ
 
-# 問い合わせを使うときに設定する(様式・受付アドレスは公開サイトに載せない)
+# 問い合わせを使うときに設定する。様式は build で dist/forms/ に公開される。
+# 受付アドレスはページに書かれず、様式の中にだけ入る
 # inquiry:
 #   address: uketsuke@example.jp
 #   staff:
@@ -148,4 +149,7 @@ def _forms(site: site_mod.Site) -> None:
         out = site.forms_out / f"{form.key}.xlsx"
         wb.save(out)
         print(f"様式を生成: {out}({form.label})")
-    print("注意: 様式と受付アドレスは公開サイトに置かない(個別に渡す)")
+    print(
+        "次回の build で dist/forms/ に公開されます"
+        "(受付アドレスはページに書かず、様式の中にだけ入っています)"
+    )

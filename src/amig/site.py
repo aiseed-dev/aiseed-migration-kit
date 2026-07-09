@@ -120,7 +120,8 @@ class Site:
 
     @property
     def forms_out(self) -> Path:
-        """生成した様式 xlsx の置き場(公開サイトには置かない)。"""
+        """生成した様式 xlsx の置き場(build が dist/forms/ に載せる。
+        inquiry.publish_forms: false で非公開にできる)。"""
         return self.root / "forms-out"
 
     # ---- 問い合わせ(inquiry) ----
