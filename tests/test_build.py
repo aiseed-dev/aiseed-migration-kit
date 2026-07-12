@@ -78,3 +78,36 @@ def test_public_passthrough(tmp_site):
     build_mod.build(tmp_site)
     assert (tmp_site.dist / "_redirects").exists()
     assert (tmp_site.dist / "a.html").exists()
+
+
+def test_adoc_article_renders_via_pyasciidoc(tmp_site):
+    """.adoc記事もfrontmatter+本文で.mdと同じ扱い。強調はCJK対応。"""
+    pytest.importorskip("pyasciidoc")
+    tmp_site.content.mkdir(parents=True)
+    (tmp_site.content / "b.adoc").write_text(
+        "---\ntitle: b\n---\n\nこれは*重要*なお知らせです。\n", encoding="utf-8"
+    )
+    build_mod.build(tmp_site)
+    page = (tmp_site.dist / "b.html").read_text(encoding="utf-8")
+    assert "<strong>重要</strong>" in page
+
+
+def test_adoc_without_pyasciidoc_raises_clear_error(tmp_site, monkeypatch):
+    """pyasciidoc未導入で.adocを使うと分かりやすいエラーになる(黙って
+    フォールバックしない ── .mdと違い代替のレンダラが無いため)。"""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **kw):
+        if name == "pyasciidoc":
+            raise ImportError("pyasciidoc not installed (test)")
+        return real_import(name, *a, **kw)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    tmp_site.content.mkdir(parents=True)
+    (tmp_site.content / "b.adoc").write_text(
+        "---\ntitle: b\n---\n\n本文。\n", encoding="utf-8"
+    )
+    with pytest.raises(build_mod.BuildError, match="pyasciidoc"):
+        build_mod.build(tmp_site)

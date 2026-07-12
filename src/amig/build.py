@@ -1,13 +1,16 @@
-"""生成: content/(.md)と data/(.yaml)から dist/ を作る(Jinja2)。
+"""生成: content/(.md/.adoc)と data/(.yaml)から dist/ を作る(Jinja2)。
 
-- 記事 .md は frontmatter(title/date/category)+ Markdown 本文
-- category が無い .md は content/ 直下の単独ページ(/<slug>.html)
+- 記事 .md/.adoc は frontmatter(title/date/category)+ 本文
+- category が無い記事は content/ 直下の単独ページ(/<slug>.html)
 - category ごとの一覧と、トップ(index.html)を生成する
 - テンプレートはサイトの templates/ が優先、無い分はキット既定
 - public/ はそのまま dist/ に写す(favicon・_redirects・_headers 等)
 
 日本語の約物・改行の扱いは mdit-py-cjk-friendly があれば有効にする
 (無くても動く。CJK 文中の強調と、和文ソフト改行の空白抑止が改善する)。
+.adoc(AsciiDoc)は pyasciidoc があれば使える(見出し・CJK対応の強調のみの
+v0スコープ。無ければ .adoc を書いた時点で分かりやすいエラーにする ──
+.md と違い代替のレンダラが無いため、フォールバックできない)。
 """
 
 from __future__ import annotations
@@ -35,6 +38,16 @@ def _markdown() -> MarkdownIt:
     except ImportError:
         pass
     return md
+
+
+def _asciidoc_render(body: str, where: str) -> str:
+    try:
+        from pyasciidoc import render as asciidoc_render
+    except ImportError as exc:
+        raise BuildError(
+            f"{where}: .adoc を使うには pyasciidoc が要ります(pip install pyasciidoc)"
+        ) from exc
+    return asciidoc_render(body)
 
 
 @dataclass(frozen=True)
@@ -73,12 +86,13 @@ def split_frontmatter(text: str, where: str) -> tuple[dict[str, Any], str]:
 
 
 def load_pages(site: Site) -> list[Page]:
-    """content/ の全 .md を読み、日付の新しい順に返す。"""
+    """content/ の全 .md/.adoc を読み、日付の新しい順に返す。"""
     md = _markdown()
     pages: list[Page] = []
     if not site.content.exists():
         return pages
-    for f in sorted(site.content.rglob("*.md")):
+    files_ = sorted({*site.content.rglob("*.md"), *site.content.rglob("*.adoc")})
+    for f in files_:
         rel = f.relative_to(site.content)
         meta, body = split_frontmatter(f.read_text(encoding="utf-8"), str(rel))
         category = str(meta.get("category") or "")
@@ -92,12 +106,17 @@ def load_pages(site: Site) -> list[Page]:
         d = meta.get("date")
         if isinstance(d, str):
             d = date.fromisoformat(d)
+        html = (
+            _asciidoc_render(body, str(rel))
+            if f.suffix == ".adoc"
+            else md.render(body)
+        )
         pages.append(
             Page(
                 slug=f.stem,
                 category=category,
                 title=str(meta.get("title") or f.stem),
-                html=md.render(body),
+                html=html,
                 date=d if isinstance(d, date) else None,
                 meta=meta,
             )

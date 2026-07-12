@@ -302,11 +302,14 @@ OnlyOffice Docs(Document Server)は保管・ユーザー管理を持たない編
 
 | 種類 | 例 | source |
 |---|---|---|
-| 記事(散文) | お知らせ・報告・各種案内 | マークダウン + frontmatter(title/date/category) |
+| 記事(散文) | お知らせ・報告・各種案内 | マークダウン(または AsciiDoc) + frontmatter(title/date/category) |
 | 構成・反復データ | トップ・一覧・料金表・検索・事業者一覧 | YAML/JSON + テンプレート |
 
-- 記事は担当者が .md を編集して更新する。frontmatter の category で
-  一覧・お知らせへの掲載を制御
+- 記事は担当者が .md(または .adoc)を編集して更新する。frontmatter の
+  category で一覧・お知らせへの掲載を制御。.adoc は pyasciidoc(CJK対応の
+  見出し・強調。§7 と同じ理由でクラウドの Claude が開発・保守を担う)が
+  無いとビルド時に分かりやすいエラーになる(§0 の「仮ではなく本格の部品」
+  の考え方どおり、黙ってフォールバックしない)
 - トップの組版・表・一覧はデータ+テンプレートで生成する
 - 判断に迷うページは記事(MD)側に倒す
 

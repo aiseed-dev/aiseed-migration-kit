@@ -14,7 +14,8 @@ DESIGN.md §2・§13 と [seminar-kit](https://github.com/aiseed-dev/seminar-kit
 - 取り込み(ingest)→ 分類(classify)→ Markdown化(convert)→
   生成(build)→ 配信(publish)のパイプライン
 - 問い合わせは申込様式(xlsx)+メール受付(inquiry)。Webフォームは作らない
-- 内容の正は `sites/<name>/content/`(Markdown+frontmatter)。git で版管理する
+- 内容の正は `sites/<name>/content/`(Markdown または AsciiDoc+frontmatter)。
+  git で版管理する
 
 ## セットアップ(コピペ2行)
 
@@ -30,6 +31,17 @@ cf-publish は同梱(vendor/。PyPI 公開後は通常の `pip install cf-publis
 
 ```bash
 pip install git+https://github.com/aiseed-dev/mdit-py-cjk-friendly
+```
+
+`content/` に `.adoc`(AsciiDoc)ファイルを置くと
+[pyasciidoc](https://github.com/aiseed-dev/pyasciidoc)で変換される
+(CJK対応の見出し・強調。既存のPython AsciiDoc実装は和文隣接の強調記法を
+認識しないため、mdit-py-cjk-friendlyの境界判定を土台に新規実装したもの。
+`.md`と違い代替レンダラが無いため、未導入で`.adoc`を使うとビルド時に
+分かりやすいエラーになる):
+
+```bash
+pip install git+https://github.com/aiseed-dev/pyasciidoc
 ```
 
 ## 使い方
