@@ -49,3 +49,25 @@ table { border-collapse: collapse; }
 th, td { border: 1px solid var(--line); padding: 0.4rem 0.6rem; }
 img { max-width: 100%; height: auto; }
 footer.site { border-top: 1px solid var(--line); color: var(--sub); font-size: 0.9rem; }
+
+/* admonition(注記) ── .adoc の NOTE:/TIP:/IMPORTANT:/WARNING:/CAUTION:
+   (pyasciidoc が <div class="admonition {label}"> を出す) */
+.admonition {
+  margin: 1rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 4px solid var(--admonition-color, var(--sub));
+  background: color-mix(in srgb, var(--admonition-color, var(--sub)) 8%, var(--bg));
+}
+.admonition > :last-child { margin-bottom: 0; }
+.admonition-label {
+  margin: 0 0 0.3rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--admonition-color, var(--sub));
+}
+.admonition.note { --admonition-color: #1d4ed8; }
+.admonition.tip { --admonition-color: #14532d; }
+.admonition.important { --admonition-color: #7c1d9e; }
+.admonition.warning { --admonition-color: #b45309; }
+.admonition.caution { --admonition-color: #b91c1c; }

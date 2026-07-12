@@ -92,6 +92,20 @@ def test_adoc_article_renders_via_pyasciidoc(tmp_site):
     assert "<strong>重要</strong>" in page
 
 
+def test_adoc_admonition_has_bundled_css(tmp_site):
+    """pyasciidocのadmonition(NOTE:等)markupに対応するCSSが同梱されている。"""
+    pytest.importorskip("pyasciidoc")
+    tmp_site.content.mkdir(parents=True)
+    (tmp_site.content / "b.adoc").write_text(
+        "---\ntitle: b\n---\n\nNOTE: 補足です。\n", encoding="utf-8"
+    )
+    build_mod.build(tmp_site)
+    page = (tmp_site.dist / "b.html").read_text(encoding="utf-8")
+    assert '<div class="admonition note">' in page
+    css = (tmp_site.dist / "style.css").read_text(encoding="utf-8")
+    assert ".admonition" in css and ".admonition.note" in css
+
+
 def test_adoc_without_pyasciidoc_raises_clear_error(tmp_site, monkeypatch):
     """pyasciidoc未導入で.adocを使うと分かりやすいエラーになる(黙って
     フォールバックしない ── .mdと違い代替のレンダラが無いため)。"""
