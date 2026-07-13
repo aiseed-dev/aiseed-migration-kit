@@ -62,13 +62,32 @@ def test_no_sender(example):
     assert reply is None
 
 
-def test_wrong_site_identifier_rejected(example):
-    """識別子(受付:)が本受付と違う様式は弾く(偽様式対策。§11)。"""
-    body = _text(example).replace("様式版: 1", "様式版: 1\n受付: yoso-no-site")
+def test_wrong_site_identifier_no_reply(example):
+    """識別子(受付:)が本受付と違う様式は pending へ。ただし自動返信は
+    しない——差出人は詐称されうるため、返信するとバックスキャッター
+    発生源になる(DESIGN.md §5・§11)。"""
+
+    body = _text(example) + "\n受付: yoso-no-site"
+    folder, reply = mailin.handle(example, _mail(body=body))
+    assert folder == mailin.PENDING
+    assert reply is None
+
+    # 識別子が一致すれば通常どおり受理される
+    body_ok = _text(example) + f"\n受付: {example.name}"
+    folder, reply = mailin.handle(example, _mail(body=body_ok))
+    assert folder == "staff/general"
+
+
+def test_stale_fingerprint_gets_fix_request(example):
+    """様式指紋の不一致(項目構成が変わった旧様式)は正規利用者の事故
+    なので、最新様式への案内を自動返信する。"""
+    from amig.inquiry import forms
+
+    body = _text(example) + f"\n{forms.KEY_REV}: 00000000"
     folder, reply = mailin.handle(example, _mail(body=body))
     assert folder == mailin.PENDING
     assert reply is not None
-    assert "本受付のものではない" in reply[2]
+    assert "更新" in reply[2]
 
 
 def test_propose_with_stub_llm(example, monkeypatch):
@@ -84,6 +103,7 @@ def test_propose_with_stub_llm(example, monkeypatch):
         seen["prompt"] = prompt
         return "お名前: 山田 太郎  # 根拠: 「名まえ 山田太郎です」"
 
+    monkeypatch.setattr(llm, "enabled", lambda: True)
     monkeypatch.setattr(llm, "complete", fake_complete)
     body = _text(example).replace("お名前: 山田 太郎\n", "名まえ 山田太郎です\n")
     note = mailin.propose(example, _mail(body=body))
@@ -99,17 +119,27 @@ def test_propose_with_stub_llm(example, monkeypatch):
 
 
 def test_propose_without_llm_is_none(example, monkeypatch):
-    """LLM 未設定(complete が None)なら何も足さない(フォールバック)。"""
-    from amig import llm
+    """LLM 未設定なら解析ごと省いて何も足さない(フォールバック)。"""
 
-    monkeypatch.setattr(llm, "complete", lambda prompt: None)
+    monkeypatch.delenv("AMIG_LLM_URL", raising=False)
     note = mailin.propose(example, _mail(body=_text(example)))
     assert note is None
+
+
+def test_propose_skips_wrong_site(example, monkeypatch):
+    """偽様式(識別子不一致)には解釈案を作らない(LLM を回させない)。"""
+    from amig import llm
+
+    monkeypatch.setattr(llm, "enabled", lambda: True)
+    monkeypatch.setattr(llm, "complete", lambda prompt: "何か")
+    body = _text(example) + "\n受付: yoso-no-site"
+    assert mailin.propose(example, _mail(body=body)) is None
 
 
 def test_propose_non_form_mail_is_none(example, monkeypatch):
     """様式を特定できないメールには提案しない。"""
     from amig import llm
 
+    monkeypatch.setattr(llm, "enabled", lambda: True)
     monkeypatch.setattr(llm, "complete", lambda prompt: "何か")
     assert mailin.propose(example, _mail(body="見積をお願いします")) is None

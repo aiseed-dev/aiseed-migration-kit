@@ -208,9 +208,14 @@ def build(site: Site) -> int:
     (site.dist / "index.html").write_text(index_t.render(**ctx), encoding="utf-8")
     n += 1
 
+    if site.public.exists():
+        shutil.copytree(site.public, site.dist, dirs_exist_ok=True)
+
     # 様式(xlsx+記入用テキスト)を公開する(受付アドレスはページに書かず
     # 様式の中にだけ。§5)。配布様式の真正性のため SHA-256 を併記する
-    # (dist/forms/sha256.txt。偽様式対策。§11)
+    # (dist/forms/sha256.txt。偽様式対策。§11)。public/ のコピーより後に
+    # 書く——public/forms/ の古いファイルが生成物やハッシュ表を上書きして
+    # 真正性記録が実物と食い違うのを防ぐ(生成物が常に勝つ)
     inquiry = site.cfg.get("inquiry") or {}
     if inquiry.get("publish_forms", True) and site.forms_out.exists():
         forms_dir = site.dist / "forms"
@@ -225,7 +230,4 @@ def build(site: Site) -> int:
             (forms_dir / "sha256.txt").write_text(
                 "\n".join(hashes) + "\n", encoding="utf-8"
             )
-
-    if site.public.exists():
-        shutil.copytree(site.public, site.dist, dirs_exist_ok=True)
     return n

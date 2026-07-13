@@ -16,11 +16,14 @@ sites/<name>/
 import importlib.util
 import re
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import yaml
+
+from amig.inquiry.spec import FieldSpec
 
 # Excel の定義名・IMAP フォルダ名に使うため、key は英小文字に限定する
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -49,7 +52,7 @@ class Field:
 
     key: str
     label: str
-    spec: Any  # amig.inquiry.spec.FieldSpec(循環importを避けて Any)
+    spec: FieldSpec
     note: str = ""  # 表示用の自由記述(様式プロファイルの本文。機械は読まない)
 
     @property
@@ -137,8 +140,11 @@ class Site:
         return self.root / "forms-out"
 
     # ---- 問い合わせ(inquiry) ----
+    # staff / forms は初回アクセスでキャッシュされる(forms はファイル読み+
+    # 解析のため)。mailin 稼働中に forms/*.adoc を編集した場合は再起動で
+    # 反映する——1通の処理の途中で定義が入れ替わる不整合を避ける
 
-    @property
+    @cached_property
     def staff(self) -> tuple[Staff, ...]:
         items = (self.cfg.get("inquiry") or {}).get("staff") or []
         out = []
@@ -154,7 +160,7 @@ class Site:
             )
         return tuple(out)
 
-    @property
+    @cached_property
     def forms(self) -> tuple[FormDef, ...]:
         items = (self.cfg.get("inquiry") or {}).get("forms") or []
         return tuple(_form_def(self.root, it) for it in items)
@@ -206,13 +212,40 @@ def _form_def(root: Path, it: Any) -> FormDef:
     except profile.ProfileError as e:
         raise SiteError(f"様式「{key}」({path.name}): {e}") from None
 
+    from amig.inquiry import forms as forms_mod
+    from amig.inquiry.parse import LABEL_MAX
+
+    reserved = {
+        forms_mod.KEY_KIND,
+        forms_mod.KEY_VER,
+        forms_mod.KEY_SITE,
+        forms_mod.KEY_REV,
+        forms_mod.KEY_STAFF,
+    }
     fields = []
+    seen: set[str] = set()
     for i, pf in enumerate(prof.fields):
         if ":" in pf.label or "：" in pf.label:
             raise SiteError(
                 f"様式「{key}」の項目「{pf.label}」にコロンは使えません"
                 "(送信用テキストの区切りと衝突するため)"
             )
+        if len(pf.label) > LABEL_MAX:
+            raise SiteError(
+                f"様式「{key}」の項目「{pf.label}」が長すぎます"
+                f"(送信用テキストで読み取れる項目名は {LABEL_MAX} 文字まで)"
+            )
+        if pf.label in reserved:
+            raise SiteError(
+                f"様式「{key}」の項目「{pf.label}」は予約された項目名です"
+                "(様式・様式版・受付・様式指紋・宛先は使えません)"
+            )
+        if pf.label in seen:
+            raise SiteError(
+                f"様式「{key}」の項目「{pf.label}」が重複しています"
+                "(項目名は DDL の列名になるため一意にしてください)"
+            )
+        seen.add(pf.label)
         try:
             sp = spec.parse(pf.label, pf.constraint)
         except spec.SpecError as e:

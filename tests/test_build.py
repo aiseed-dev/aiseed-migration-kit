@@ -136,3 +136,16 @@ def test_forms_sha256_published(tmp_site):
     build_mod.build(tmp_site)
     line = (tmp_site.dist / "forms" / "sha256.txt").read_text(encoding="utf-8")
     assert line == f"{hashlib.sha256(b'dummy').hexdigest()}  contact.xlsx\n"
+
+
+def test_public_cannot_clobber_forms(tmp_site):
+    """public/forms/ の古いファイルが生成様式・sha256.txt を上書きしない
+    (生成物が勝つ。真正性記録と実物の食い違い防止。§11)。"""
+    tmp_site.forms_out.mkdir(parents=True)
+    (tmp_site.forms_out / "contact.xlsx").write_bytes(b"genuine")
+    (tmp_site.public / "forms").mkdir(parents=True)
+    (tmp_site.public / "forms" / "contact.xlsx").write_bytes(b"stale")
+    (tmp_site.public / "forms" / "sha256.txt").write_text("stale", encoding="utf-8")
+    build_mod.build(tmp_site)
+    assert (tmp_site.dist / "forms" / "contact.xlsx").read_bytes() == b"genuine"
+    assert "stale" not in (tmp_site.dist / "forms" / "sha256.txt").read_text()

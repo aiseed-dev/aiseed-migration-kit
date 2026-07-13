@@ -29,6 +29,11 @@ log = logging.getLogger(__name__)
 TIMEOUT = 120  # ローカルの大型モデルは遅い
 
 
+def enabled() -> bool:
+    """ローカル LLM が設定されているか(呼び出し前の早期判定に使う)。"""
+    return bool(os.environ.get("AMIG_LLM_URL", "").strip())
+
+
 def complete(prompt: str) -> str | None:
     """プロンプト1つ → 応答テキスト。LLM 未設定・失敗は None。"""
     url = os.environ.get("AMIG_LLM_URL", "").strip()

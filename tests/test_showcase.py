@@ -46,7 +46,11 @@ SEMINAR_FILLED = {
 
 
 def _text(form_key: str, staff: str, values: dict[str, str]) -> str:
-    lines = [f"{forms.KEY_KIND}: {form_key}", f"{forms.KEY_VER}: 1", f"宛先: {staff}"]
+    lines = [
+        f"{forms.KEY_KIND}: {form_key}",
+        f"{forms.KEY_VER}: {forms.FORM_VER}",
+        f"宛先: {staff}",
+    ]
     lines += [f"{label}: {v}" for label, v in values.items()]
     return "\n".join(lines)
 

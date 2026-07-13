@@ -90,3 +90,67 @@ def test_freeze_with_git_source(tmp_path):
     rec = yaml.safe_load(out.read_text(encoding="utf-8"))
     assert rec["生成元"] == str(src)
     assert len(rec["生成元コミット"]) == 40
+
+
+def test_freeze_refuses_overwrite(tmp_path):
+    """凍結記録は上書きしない(convert と同型の保護)。"""
+    import pytest
+
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"x")
+    decision.freeze(pdf)
+    with pytest.raises(decision.DecisionError, match="既にあります"):
+        decision.freeze(pdf)
+
+
+def test_freeze_refuses_dirty_source(tmp_path):
+    """生成元に未コミット変更があるときは凍結を拒否する(誤った生成元
+    コミットを記録しない)。"""
+    import pytest
+
+    src = tmp_path / "invoice.adoc"
+    src.write_text("= 請求書\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "add", "."],
+        cwd=tmp_path,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "x"],
+        cwd=tmp_path,
+        check=True,
+    )
+    src.write_text("= 請求書(金額修正)\n", encoding="utf-8")  # 未コミット
+    pdf = tmp_path / "invoice.pdf"
+    pdf.write_bytes(b"x")
+    with pytest.raises(decision.DecisionError, match="未コミット"):
+        decision.freeze(pdf, source=src)
+
+
+def test_freeze_refuses_missing_source(tmp_path):
+    import pytest
+
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"x")
+    with pytest.raises(decision.DecisionError, match="ありません"):
+        decision.freeze(pdf, source=tmp_path / "nai.adoc")
+
+
+def test_scan_reports_non_utf8_file(tmp_path):
+    """非 UTF-8 の .adoc はファイル名つきの日本語エラーになる。"""
+    import pytest
+
+    (tmp_path / "sjis.adoc").write_bytes("= 題名\n".encode("shift_jis"))
+    with pytest.raises(decision.DecisionError, match="sjis.adoc"):
+        decision.scan(tmp_path)
+
+
+def test_explicit_doctitle_attr_wins(tmp_path):
+    """明示の :doctitle: 属性が = 題名より勝つ(属性が正。§14)。"""
+    (tmp_path / "a.adoc").write_text(
+        "= 見た目の題\n:doctitle: 正式な題\n", encoding="utf-8"
+    )
+    sql = decision.index_sql(decision.scan(tmp_path))
+    assert "'doctitle', '正式な題'" in sql
+    assert "'見た目の題'" not in sql

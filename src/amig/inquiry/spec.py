@@ -139,12 +139,15 @@ def parse(label: str, constraint: str) -> FieldSpec:
             )
             if not choices:
                 raise SpecError(f"項目「{label}」の in (...) に選択肢がありません")
+            for c in choices:
+                _check_nfkc(label, "選択肢", c)
         elif bm:
             _check_subject(label, bm.group(1))
             between = (int(bm.group(2)), int(bm.group(3)))
         elif xm:
             _check_subject(label, xm.group(1))
             pattern = xm.group(2).replace("''", "'")
+            _check_nfkc(label, "正規表現", pattern)
         else:
             raise SpecError(
                 f"項目「{label}」の check「{expr}」は語彙にありません"
@@ -171,6 +174,19 @@ def _check_subject(label: str, subject: str) -> None:
         )
 
 
+def _check_nfkc(label: str, what: str, s: str) -> None:
+    """選択肢・正規表現は NFKC 正規形で書かれていること。
+
+    受信値は repair() で必ず NFKC 正規化されるため、制約側に全角英数字等の
+    非正規形があると、正規の様式からの投稿でも永久に検証を通らない。
+    """
+    if unicodedata.normalize("NFKC", s) != s:
+        raise SpecError(
+            f"項目「{label}」の{what}「{s}」が NFKC 正規形ではありません"
+            "(受信時の正規化と食い違うため。全角英数字は半角で書いてください)"
+        )
+
+
 def column_sql(sp: FieldSpec) -> str:
     """DDL の列定義部分。角括弧内のカンマは列挙の区切り(SQL のカンマでは
     ない)ため、空白で結合して SQL にする。"""
@@ -184,7 +200,6 @@ def column_sql(sp: FieldSpec) -> str:
 _ERA_RE = re.compile(r"^(令和|平成|昭和)\s*(元|\d{1,2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?$")
 _ERA_BASE = {"令和": 2018, "平成": 1988, "昭和": 1925}
 _DATE_RE = re.compile(r"^(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?$")
-_KATAKANA_CLASS_RE = re.compile(r"[ァ-ヶ]-[ァ-ヶ]|カタカナ")
 
 
 def _hira_to_kata(s: str) -> str:
@@ -195,7 +210,12 @@ def _hira_to_kata(s: str) -> str:
 
 def repair(sp: FieldSpec, value: str) -> str:
     """制約から一意に導出できる修復だけを行う(できない入力はそのまま返し、
-    検証で落ちて pending へ行く)。"""
+    検証で落ちて pending へ行く)。
+
+    ひらがな→カタカナは、制約の意味から導出する: 元の値が正規表現制約を
+    満たさず、変換後なら満たす場合にだけ変換する(制約文字列の見た目で
+    判断しない。両方の文字種を許す制約なら元の表記を保つ)。
+    """
     v = unicodedata.normalize("NFKC", value).strip()
     if sp.type == "date":
         m = _ERA_RE.match(v)
@@ -206,6 +226,12 @@ def repair(sp: FieldSpec, value: str) -> str:
         if m:
             return f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
         return v
-    if sp.pattern and _KATAKANA_CLASS_RE.search(sp.pattern):
-        return _hira_to_kata(v)
+    if sp.pattern:
+        try:
+            if not re.search(sp.pattern, v):
+                k = _hira_to_kata(v)
+                if k != v and re.search(sp.pattern, k):
+                    return k
+        except re.error:
+            pass  # 正規表現が Python 方言で読めない場合は修復しない
     return v

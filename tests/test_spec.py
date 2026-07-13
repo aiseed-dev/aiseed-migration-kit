@@ -70,3 +70,20 @@ def test_repair_kana_from_pattern():
     assert spec.repair(sp, "やまだ たろう") == "ヤマダ タロウ"
     # 漢字は一意に導出できないので修復しない
     assert spec.repair(sp, "山田") == "山田"
+
+
+def test_choice_must_be_nfkc():
+    """全角英数字の選択肢は受信時の NFKC 正規化と食い違うため弾く。"""
+    with pytest.raises(spec.SpecError, match="NFKC"):
+        spec.parse("参加場所", "varchar(10), check (参加場所 in ('ＺＯＯＭ'))")
+
+
+def test_pattern_must_be_nfkc():
+    with pytest.raises(spec.SpecError, match="NFKC"):
+        spec.parse("番号", "varchar(10), check (番号 ~ '^[０-９]+$')")
+
+
+def test_repair_kana_keeps_valid_script():
+    """両文字種を許す制約なら、元の表記(ひらがな)を保つ。"""
+    sp = spec.parse("氏名かな", "varchar(50), check (氏名かな ~ '^[ぁ-ゖァ-ヶー ]+$')")
+    assert spec.repair(sp, "やまだ たろう") == "やまだ たろう"

@@ -11,6 +11,8 @@
 DESIGN.md §5)。発行キーは埋め込まない。
 """
 
+import hashlib
+
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Side
 from openpyxl.utils import quote_sheetname
@@ -20,7 +22,9 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from amig.site import FormDef, Site
 
-FORM_VER = 1
+# 様式の版(送信テキストのプロトコル版)。定義名の体系が変わったら上げる。
+# 2 = 様式プロファイル移行(定義名が f_<key> から f_c<N> に変わった)
+FORM_VER = 2
 SHEET = "記入シート"
 TEXT_SHEET = "送信用テキスト"
 
@@ -32,7 +36,17 @@ STAFF_LABEL = "宛先(担当)"
 KEY_KIND = "様式"
 KEY_VER = "様式版"
 KEY_SITE = "受付"  # site.yaml 由来の識別子(偽様式対策。受付側で照合。§11)
+KEY_REV = "様式指紋"  # 項目構成のハッシュ(下記 rev()。版の上げ忘れ対策)
 KEY_STAFF = "宛先"
+
+
+def rev(form: FormDef) -> str:
+    """様式指紋: 項目構成(ラベル+制約の並び)から決定的に導出する短い
+    ハッシュ。プロファイルの項目を挿入・入替すると必ず変わるため、
+    FORM_VER(人が上げるプロトコル版)と違い、配布済み xlsx の位置ずれ
+    (f_c1.. が別の項目を指す)を機械的に検出できる。"""
+    src = form.key + "\n" + "\n".join(f"{f.label}|{f.spec.sql}" for f in form.fields)
+    return hashlib.sha256(src.encode("utf-8")).hexdigest()[:8]
 
 
 def names(form: FormDef) -> dict[str, str]:
@@ -41,6 +55,7 @@ def names(form: FormDef) -> dict[str, str]:
         "form_kind": "H1",
         "form_ver": "H2",
         "form_site": "H3",
+        "form_rev": "H4",
         "staff": f"C{_STAFF_ROW}",
     }
     for i, f in enumerate(form.fields):
@@ -54,6 +69,7 @@ def text_keys(form: FormDef) -> dict[str, str]:
         "form_kind": KEY_KIND,
         "form_ver": KEY_VER,
         "form_site": KEY_SITE,
+        "form_rev": KEY_REV,
         "staff": KEY_STAFF,
     }
     for f in form.fields:
@@ -125,6 +141,7 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
     ws[n["form_kind"]] = form.key
     ws[n["form_ver"]] = FORM_VER
     ws[n["form_site"]] = site.name  # 識別子(偽様式対策。受付側で照合)
+    ws[n["form_rev"]] = rev(form)  # 様式指紋(項目構成の変更検出)
     ws.column_dimensions["H"].hidden = True
 
     for name, coord in n.items():
@@ -132,37 +149,44 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
         wb.defined_names[name] = DefinedName(name, attr_text=ref)
 
     # 宛先(担当)はドロップダウン
-    dv = DataValidation(
-        type="list",
-        formula1='"' + ",".join(s.label for s in site.staff) + '"',
-        allow_blank=True,
-        showErrorMessage=True,
-        error="リストから選んでください",
-    )
-    ws.add_data_validation(dv)
-    dv.add(ws[n["staff"]])
+    _dropdown(ws, n["staff"], [s.label for s in site.staff])
 
     # 選択肢(check in)のある項目もドロップダウン(制約から派生)
     for f in form.fields:
         if f.spec.choices:
-            fdv = DataValidation(
-                type="list",
-                formula1='"' + ",".join(f.spec.choices) + '"',
-                allow_blank=True,
-                showErrorMessage=True,
-                error="リストから選んでください",
-            )
-            ws.add_data_validation(fdv)
-            fdv.add(ws[n[f"f_{f.key}"]])
+            _dropdown(ws, n[f"f_{f.key}"], list(f.spec.choices))
 
     # 入力セル以外はシート保護
+    meta = ("form_kind", "form_ver", "form_site", "form_rev")
     for name, coord in n.items():
-        if name not in ("form_kind", "form_ver", "form_site"):
+        if name not in meta:
             ws[coord].protection = Protection(locked=False)
     ws.protection.sheet = True
 
     _text_sheet(wb, form, submit_addr)
     return wb
+
+
+def _dropdown(ws: Worksheet, coord: str, values: list[str]) -> None:
+    """ドロップダウン(インラインリスト)を張る。
+
+    Excel のインラインリストはカンマ区切り・二重引用符不可・255文字上限。
+    表せない選択肢(カンマや " を含む・長すぎる)はドロップダウンを付けず
+    自由入力にする——選択肢の案内は E 列に出ており、正の検証は常に
+    サーバー側(選択肢を分裂・欠落させて検証と食い違うより良い)。
+    """
+    joined = ",".join(values)
+    if any("," in v or '"' in v for v in values) or len(joined) > 255:
+        return
+    dv = DataValidation(
+        type="list",
+        formula1=f'"{joined}"',
+        allow_blank=True,
+        showErrorMessage=True,
+        error="リストから選んでください",
+    )
+    ws.add_data_validation(dv)
+    dv.add(ws[coord])
 
 
 TEXT_ROW0 = 6  # 送信用テキストの本文が始まる行(A列。数式で自動生成)

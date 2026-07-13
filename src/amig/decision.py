@@ -29,12 +29,15 @@ from pathlib import Path
 
 import yaml
 
+from amig import adoc
+
 # AsciiDoc の文書属性 ``:name: value``。名前の文字種は AsciiDoc の慣例
 # (英数字・ハイフン・アンダースコア)に限る
 _ATTR_RE = re.compile(r"^:([A-Za-z0-9][A-Za-z0-9_-]*):[ \t]*(.*)$")
-_TITLE_RE = re.compile(r"^=[ \t]+(\S.*?)[ \t]*$")
-_LINE_COMMENT_RE = re.compile(r"^//(?!/)")
-_BLOCK_COMMENT_DELIM_RE = re.compile(r"^/{4,}[ \t]*$")
+
+
+class DecisionError(Exception):
+    """決裁部品の入力不備(担当者向けの日本語メッセージ)。"""
 
 
 @dataclass(frozen=True)
@@ -50,31 +53,19 @@ def parse_attrs(text: str) -> tuple[str, dict[str, str]]:
     """文書から題名と属性を読む。
 
     属性は文書のどこにあっても拾う(慣例はヘッダー)が、同名の属性は
-    最初のものが勝つ。コメント(``//``・``////``)の中は読まない。
+    最初のものが勝つ。コメント(``//``・``////``)の中は読まない
+    (何がコメントかの定義は様式プロファイルと共通: amig.adoc)。
     """
     title = ""
     attrs: dict[str, str] = {}
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if _BLOCK_COMMENT_DELIM_RE.match(line):
-            i += 1
-            while i < len(lines) and not _BLOCK_COMMENT_DELIM_RE.match(lines[i]):
-                i += 1
-            i += 1
-            continue
-        if _LINE_COMMENT_RE.match(line):
-            i += 1
-            continue
+    for line in adoc.strip_comments(text):
         m = _ATTR_RE.match(line)
         if m and m.group(1) not in attrs:
             attrs[m.group(1)] = m.group(2).strip()
         elif not title:
-            t = _TITLE_RE.match(line)
+            t = adoc.TITLE_RE.match(line)
             if t:
                 title = t.group(1)
-        i += 1
     return title, attrs
 
 
@@ -82,7 +73,13 @@ def scan(root: Path) -> list[Doc]:
     """root 以下の .adoc を走査して属性を集める(パス順で決定的)。"""
     docs = []
     for path in sorted(root.rglob("*.adoc")):
-        title, attrs = parse_attrs(path.read_text(encoding="utf-8"))
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raise DecisionError(
+                f"{path} が UTF-8 で読めません(文字コードを確認してください)"
+            ) from None
+        title, attrs = parse_attrs(text)
         docs.append(Doc(path=str(path.relative_to(root)), title=title, attrs=attrs))
     return docs
 
@@ -112,7 +109,10 @@ def index_sql(docs: list[Doc]) -> str:
         f'delete from "{TABLE}";',
     ]
     for doc in docs:
-        rows = {"doctitle": doc.title, **doc.attrs} if doc.title else dict(doc.attrs)
+        # 明示の :doctitle: 属性があればそちらが勝つ(属性が正。§14)
+        rows = dict(doc.attrs)
+        if doc.title:
+            rows.setdefault("doctitle", doc.title)
         for name, value in rows.items():
             out.append(
                 f'insert into "{TABLE}" ("パス", "属性", "値") '
@@ -122,19 +122,29 @@ def index_sql(docs: list[Doc]) -> str:
     return "\n".join(out) + "\n"
 
 
-def _git_commit(path: Path) -> str:
-    """path を最後に変更したコミットのハッシュ(git 管理外なら空)。"""
+def _git(path: Path, *args: str) -> str:
+    """path のディレクトリで git を実行し stdout を返す(失敗・ハングは空)。"""
     try:
         r = subprocess.run(
-            ["git", "log", "-n", "1", "--format=%H", "--", path.name],
+            ["git", *args, "--", path.name],
             cwd=path.parent,
             capture_output=True,
             text=True,
             timeout=10,
         )
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
         return ""
     return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def _git_commit(path: Path) -> str:
+    """path を最後に変更したコミットのハッシュ(git 管理外なら空)。"""
+    return _git(path, "log", "-n", "1", "--format=%H")
+
+
+def _git_dirty(path: Path) -> bool:
+    """path に未コミットの変更(未追跡含む)があるか。git 管理外は False。"""
+    return bool(_git(path, "status", "--porcelain"))
 
 
 def freeze(artifact: Path, source: Path | None = None) -> Path:
@@ -143,7 +153,26 @@ def freeze(artifact: Path, source: Path | None = None) -> Path:
     記録: 交付物の SHA-256+生成元(AsciiDoc のパスとコミットハッシュ)。
     交付物そのもの(PDF/A)と並べて保存し、後から「この交付物はこの決裁
     文書のこの版から生成された」を検証できるようにする。
+
+    凍結の名のとおり、既存の記録は上書きしない(convert が既存 .md を
+    上書きしないのと同型の保護)。生成元に未コミットの変更がある場合も
+    拒否する——記録するコミットの内容と実際の生成元が食い違い、検証の
+    ための記録自体が誤証拠になるため(決裁=マージ済みの文書から交付する)。
     """
+    out = artifact.with_name(artifact.name + ".hash.yaml")
+    if out.exists():
+        raise DecisionError(
+            f"凍結記録 {out} が既にあります(凍結記録は上書きしません。"
+            "作り直す場合は先に既存の記録を確認・退避してください)"
+        )
+    if source is not None:
+        if not source.is_file():
+            raise DecisionError(f"生成元 {source} がありません")
+        if _git_dirty(source):
+            raise DecisionError(
+                f"生成元 {source} に未コミットの変更があります。"
+                "コミット(決裁)してから凍結してください"
+            )
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     record: dict[str, str] = {"交付物": artifact.name, "sha256": digest}
     if source is not None:
@@ -151,7 +180,6 @@ def freeze(artifact: Path, source: Path | None = None) -> Path:
         commit = _git_commit(source)
         if commit:
             record["生成元コミット"] = commit
-    out = artifact.with_name(artifact.name + ".hash.yaml")
     out.write_text(
         yaml.safe_dump(record, allow_unicode=True, sort_keys=False),
         encoding="utf-8",

@@ -48,6 +48,15 @@ class Invalid(Exception):
         super().__init__(" / ".join(issues))
 
 
+class WrongSite(Exception):
+    """本受付のものではない様式(識別子の不一致=偽様式の疑い)。
+
+    Invalid と違い自動返信しない——差出人は詐称されうるため、返信すると
+    バックスキャッター発生源になる(DESIGN.md §5「様式由来でないメールには
+    自動返信しない」)。呼び出し側は黙って pending に落とし、人が判断する。
+    """
+
+
 _NOT_A_FORM = "様式のファイルではないようです。ご案内した様式をご利用ください。"
 
 
@@ -68,13 +77,20 @@ def _assemble(value_of: Callable[[str], str | None], site: Site) -> Inquiry:
             ]
         )
     # 識別子の照合(偽様式対策。§11)。無い場合は寛容に受ける
-    # (手書き・旧配布の様式を弾かない)。有って違うときだけ弾く
+    # (手書きの様式を弾かない)。有って違うときは WrongSite(返信なし)
     sid = value_of("form_site")
     if sid is not None and sid != site.name:
+        raise WrongSite(f"受付識別子が不一致: {sid}")
+    # 様式指紋の照合(項目構成の変更検出)。FORM_VER は人が上げる
+    # プロトコル版なので上げ忘れうるが、指紋は定義から機械的に導出される
+    # ため、項目の挿入・入替で位置(f_c1..)がずれた旧様式を確実に弾ける。
+    # 無い場合は寛容に受ける(手書きのテキストは位置に依存しないため安全)
+    frev = value_of("form_rev")
+    if frev is not None and frev != forms.rev(form):
         raise Invalid(
             [
-                "お手元の様式は本受付のものではないようです。"
-                "ご案内した様式をご利用ください。"
+                "様式が更新されています。お手数ですが最新の様式を"
+                "ダウンロードしてご利用ください。"
             ]
         )
 
@@ -115,16 +131,15 @@ def _validate(form: FormDef, values: dict[str, str]) -> list[str]:
     """制約検証(様式プロファイルから派生した Pydantic モデル。正の検証)。
 
     未記入(required)は呼び出し側が先に検出しているため、ここでは
-    記入された値の制約違反だけを日本語の issue にする。
+    記入された値の制約違反だけを日本語の issue にする。pydantic の
+    エラー位置(loc)は alias=日本語ラベルで返る。
     """
     try:
         derive.model(form).model_validate(values)
     except ValidationError as e:
-        key_to_label = {f.key: f.label for f in form.fields}
         issues = []
         for err in e.errors():
-            loc = str(err["loc"][0]) if err["loc"] else ""
-            label = key_to_label.get(loc, loc)
+            label = str(err["loc"][0]) if err["loc"] else ""
             if label not in values:
                 continue  # 未記入は上で報告済み
             reason = _ERR_JA.get(err["type"], "記入内容をご確認ください")
@@ -174,15 +189,17 @@ def parse_xlsx(src: bytes | BinaryIO | Path, site: Site) -> Inquiry:
     return _assemble(lambda name: _value(wb, name), site)
 
 
-_LINE_RE = re.compile(r"^\s*([^::]{1,20})[::]\s*(.*?)\s*$")
+# テキストチャネルの項目名の上限。site.py が様式ラベルの長さをこれで
+# 検査する(長いラベルはこの正規表現にマッチせず読み取れなくなるため)
+LABEL_MAX = 20
+_LINE_RE = re.compile(rf"^\s*([^::]{{1,{LABEL_MAX}}})[::]\s*(.*?)\s*$")
 
 
-def parse_text(body: str, site: Site) -> Inquiry | None:
-    """メール本文の送信用テキストを読み取る。
+def text_fields(body: str) -> dict[str, str]:
+    """本文から `項目: 値` の行を寛容に集める(最初の値が勝つ)。
 
-    「様式:」行が無ければ送信用テキストではない → None(呼び出し側は
-    未処理へ流す)。あれば xlsx と同じ検証を通し、不備は Invalid。
-    行単位の `項目: 値` を寛容に読む(前後の空白・引用符・全角コロン可)。
+    前後の空白・返信の引用(>)・引用符・全角コロンに耐える。parse_text と
+    mailin.propose が同じ読み方をするための共通入口。
     """
     fields: dict[str, str] = {}
     for line in body.splitlines():
@@ -193,7 +210,17 @@ def parse_text(body: str, site: Site) -> Inquiry | None:
         key, value = m.group(1).strip(), m.group(2).strip()
         if key and value and key not in fields:
             fields[key] = value
+    return fields
 
+
+def parse_text(body: str, site: Site) -> Inquiry | None:
+    """メール本文の送信用テキストを読み取る。
+
+    「様式:」行が無ければ送信用テキストではない → None(呼び出し側は
+    未処理へ流す)。あれば xlsx と同じ検証を通し、不備は Invalid。
+    行単位の `項目: 値` を寛容に読む(前後の空白・引用符・全角コロン可)。
+    """
+    fields = text_fields(body)
     kind = fields.get(forms.KEY_KIND)
     if kind is None:
         return None

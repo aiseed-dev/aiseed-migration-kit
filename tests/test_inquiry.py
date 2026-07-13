@@ -87,7 +87,11 @@ def test_choices_dropdown(example):
 
 
 def _text(example, values=FILLED, kind="contact") -> str:
-    lines = [f"{forms.KEY_KIND}: {kind}", f"{forms.KEY_VER}: 1", "宛先: 総合窓口"]
+    lines = [
+        f"{forms.KEY_KIND}: {kind}",
+        f"{forms.KEY_VER}: {forms.FORM_VER}",
+        "宛先: 総合窓口",
+    ]
     for label, v in values.items():
         lines.append(f"{label}: {v}")
     return "\n".join(lines)
@@ -115,7 +119,9 @@ def test_text_not_a_form(example):
 
 def test_text_unknown_kind(example):
     with pytest.raises(parse.Invalid):
-        parse.parse_text("様式: nai\n様式版: 1\n", example)
+        parse.parse_text(
+            f"様式: nai\n様式版: {forms.FORM_VER}\n", example
+        )
 
 
 def test_staff_prefix_match(example):
@@ -176,3 +182,64 @@ def test_macro_js(example):
     assert "電話番号" in js  # 必須チェックが様式定義から生成される
     assert forms.TEXT_SHEET in js
     assert "Api.GetSheet" in js
+
+
+def test_dropdown_skipped_for_comma_choice():
+    """カンマ入り選択肢はインラインリストで表せないためドロップダウンを
+    付けない(選択肢が分裂してサーバー検証と食い違うより良い)。"""
+    from types import SimpleNamespace
+
+    from amig import site as site_mod
+    from amig.inquiry import spec
+
+    dummy = SimpleNamespace(
+        name="x", title="t", staff=(site_mod.Staff(key="g", label="窓口", folder="staff/g"),)
+    )
+    prof = site_mod.FormDef(
+        key="a",
+        label="様式",
+        intro="",
+        fields=(
+            site_mod.Field(
+                key="c1",
+                label="区分",
+                spec=spec.parse(
+                    "区分", "varchar(20), check (区分 in ('1,000本まで', '継続'))"
+                ),
+            ),
+        ),
+    )
+    wb = forms.build(dummy, prof, "a@example.jp")
+    ws = wb[forms.SHEET]
+    formulas = [dv.formula1 for dv in ws.data_validations.dataValidation]
+    assert not any("000本まで" in f for f in formulas)
+    assert any("窓口" in f for f in formulas)  # 宛先側は通常どおり
+
+
+def test_fingerprint_changes_on_reorder(example):
+    """項目の挿入・入替で様式指紋が必ず変わる(位置ずれの検出根拠)。"""
+    form = example.form("contact")
+    r1 = forms.rev(form)
+    from amig.site import FormDef
+
+    swapped = FormDef(
+        key=form.key,
+        label=form.label,
+        intro=form.intro,
+        fields=(form.fields[1], form.fields[0], *form.fields[2:]),
+    )
+    assert forms.rev(swapped) != r1
+
+
+def test_stale_fingerprint_rejected(example):
+    """指紋が違う(構成が変わった)様式からの投稿は最新様式へ案内。"""
+    body = _text(example) + f"\n{forms.KEY_REV}: 00000000"
+    with pytest.raises(parse.Invalid, match="更新"):
+        parse.parse_text(body, example)
+
+
+def test_current_fingerprint_accepted(example):
+    form = example.form("contact")
+    body = _text(example) + f"\n{forms.KEY_REV}: {forms.rev(form)}"
+    inq = parse.parse_text(body, example)
+    assert inq is not None

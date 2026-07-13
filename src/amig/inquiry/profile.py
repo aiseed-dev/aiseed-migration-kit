@@ -40,10 +40,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-_TITLE_RE = re.compile(r"^=[ \t]+(\S.*?)[ \t]*$")
-_LABEL_ITEM_RE = re.compile(r"^(\S[^:\n]*?)::[ \t]*(.*)$")
-_LINE_COMMENT_RE = re.compile(r"^//(?!/)")
-_BLOCK_COMMENT_DELIM_RE = re.compile(r"^/{4,}[ \t]*$")
+from amig import adoc
+
+# ラベルに ASCII コロンを含む行もここでは受理する(そのうえで site 側の
+# 検査が「コロンは使えません」と音を立てて弾く。黙って項目が消えるより良い)
+_LABEL_ITEM_RE = re.compile(r"^(\S.*?)::[ \t]*(.*)$")
 
 
 def _split_bracket(rest: str) -> tuple[str, str] | None:
@@ -101,27 +102,6 @@ class FormProfile:
         raise KeyError(label)
 
 
-def _strip_comments(text: str) -> list[str]:
-    """コメントを除いた行のリストを返す(pyasciidoc と同じ規約)。"""
-    out = []
-    lines = text.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        if _BLOCK_COMMENT_DELIM_RE.match(line):
-            i += 1
-            while i < len(lines) and not _BLOCK_COMMENT_DELIM_RE.match(lines[i]):
-                i += 1
-            i += 1  # 閉じ側の //// も読み飛ばす
-            continue
-        if _LINE_COMMENT_RE.match(line):
-            i += 1
-            continue
-        out.append(line)
-        i += 1
-    return out
-
-
 def parse(text: str) -> FormProfile:
     """様式プロファイル(AsciiDoc テキスト)を FormProfile に解釈する。
 
@@ -129,12 +109,12 @@ def parse(text: str) -> FormProfile:
     知らせる——機械が保証すべき構造なので、黙って読み飛ばさない
     (DESIGN.md §0「機械が保証すべきものは決定的に」)。
     """
-    lines = _strip_comments(text)
+    lines = adoc.strip_comments(text)
 
     title = ""
     body_start = 0
     for idx, line in enumerate(lines):
-        m = _TITLE_RE.match(line)
+        m = adoc.TITLE_RE.match(line)
         if m:
             title = m.group(1)
             body_start = idx + 1

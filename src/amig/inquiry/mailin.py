@@ -115,6 +115,8 @@ def handle(site: Site, raw: bytes) -> tuple[str, tuple[str, str, str] | None]:
     # (a) 本文の送信用テキスト(「様式:」行があれば様式由来と判断)
     try:
         inq = parse.parse_text(body_text(msg), site)
+    except parse.WrongSite:
+        return PENDING, None  # 偽様式の疑い → 自動返信しない(逆流防止)
     except parse.Invalid as e:
         subject, text = mail.fix_request(e.issues)
         return PENDING, (sender, subject, text)
@@ -125,6 +127,8 @@ def handle(site: Site, raw: bytes) -> tuple[str, tuple[str, str, str] | None]:
             return PENDING, None  # (d) 様式由来でない → 自動返信しない
         try:
             inq = parse.parse_xlsx(xlsx, site)
+        except parse.WrongSite:
+            return PENDING, None  # 偽様式の疑い → 自動返信しない
         except parse.Invalid as e:
             subject, text = mail.fix_request(e.issues)
             return PENDING, (sender, subject, text)
@@ -140,19 +144,23 @@ def propose(site: Site, raw: bytes) -> bytes | None:
     解釈案は AI の提案であり、登録・自動返信には使われない——pending
     フォルダで原文の隣に置かれ、人が確認するための下書きに徹する。
     """
-    from amig.inquiry import derive, forms
     from amig import llm
+    from amig.inquiry import derive, forms
+
+    if not llm.enabled():
+        return None  # LLM 未設定なら解析ごと省く(ルールベース=何もしない)
 
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     body = body_text(msg)
+    fields = parse.text_fields(body)
+    # 偽様式(識別子不一致)には提案しない(攻撃者に LLM を回させない)
+    sid = fields.get(forms.KEY_SITE)
+    if sid is not None and sid != site.name:
+        return None
     # 「様式:」行から対象の様式を特定する(特定できなければ提案しない)
-    kind = None
-    for line in body.splitlines():
-        m = parse._LINE_RE.match(line.lstrip('> "'))
-        if m and m.group(1).strip() == forms.KEY_KIND:
-            kind = m.group(2).strip()
-            break
-    form = next((f for f in site.forms if f.key == kind), None)
+    form = next(
+        (f for f in site.forms if f.key == fields.get(forms.KEY_KIND)), None
+    )
     if form is None:
         return None
 

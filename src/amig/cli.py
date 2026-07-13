@@ -22,12 +22,15 @@ from pathlib import Path
 from amig import build as build_mod
 from amig import classify as classify_mod
 from amig import convert as convert_mod
+from amig import decision as decision_mod
 from amig import ingest as ingest_mod
 from amig import publish as publish_mod
 from amig import site as site_mod
 
 NEW_SITE_YAML = """\
 title: サイト名(機関名)
+# name: mysite  # 受付識別子(様式に埋まる。既定はディレクトリ名)。
+#               # 問い合わせを使うなら明示し、運用開始後は変えない
 # base_url: https://example.pages.dev
 # project: example        # Cloudflare Pages のプロジェクト名(既定はサイト名)
 lang: ja
@@ -110,7 +113,12 @@ def main(argv: list[str] | None = None) -> None:
     args = p.parse_args(argv)
     try:
         _run(args)
-    except (site_mod.SiteError, build_mod.BuildError, publish_mod.PublishError) as e:
+    except (
+        site_mod.SiteError,
+        build_mod.BuildError,
+        publish_mod.PublishError,
+        decision_mod.DecisionError,
+    ) as e:
         print(f"エラー: {e}", file=sys.stderr)
         raise SystemExit(1) from None
 
@@ -128,20 +136,16 @@ def _run(args: argparse.Namespace) -> None:
 
     # 決裁部品(§14)はサイト設定に依存しない
     if args.cmd == "docindex":
-        from amig import decision
-
         root = Path(args.dir)
         if not root.is_dir():
             raise site_mod.SiteError(f"{root} はディレクトリではありません")
-        print(decision.index_sql(decision.scan(root)), end="")
+        print(decision_mod.index_sql(decision_mod.scan(root)), end="")
         return
     if args.cmd == "freeze":
-        from amig import decision
-
         artifact = Path(args.file)
         if not artifact.is_file():
             raise site_mod.SiteError(f"{artifact} がありません")
-        out = decision.freeze(
+        out = decision_mod.freeze(
             artifact, source=Path(args.source) if args.source else None
         )
         print(f"凍結記録を作成: {out}")

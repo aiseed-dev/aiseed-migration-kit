@@ -77,3 +77,37 @@ def test_bad_constraint_vocabulary(tmp_path):
 def test_missing_site_yaml(tmp_path):
     with pytest.raises(site_mod.SiteError, match="site.yaml"):
         site_mod.load(tmp_path)
+
+
+def test_label_too_long_rejected(tmp_path):
+    """テキストチャネルで読み取れない長さ(20文字超)のラベルは弾く。"""
+    cfg = {"title": "t", "inquiry": {"forms": ["forms/a.adoc"]}}
+    label = "あ" * 21
+    forms = {"forms/a.adoc": f"= 様式\n\n{label}:: [text, not null]\n"}
+    with pytest.raises(site_mod.SiteError, match="長すぎます"):
+        site_mod.load(_write(tmp_path, cfg, forms))
+
+
+def test_reserved_label_rejected(tmp_path):
+    """予約された項目名(受付・様式等)は識別子行と衝突するため弾く。"""
+    cfg = {"title": "t", "inquiry": {"forms": ["forms/a.adoc"]}}
+    forms = {"forms/a.adoc": "= 様式\n\n受付:: [text, not null]\n"}
+    with pytest.raises(site_mod.SiteError, match="予約された"):
+        site_mod.load(_write(tmp_path, cfg, forms))
+
+
+def test_duplicate_label_rejected(tmp_path):
+    cfg = {"title": "t", "inquiry": {"forms": ["forms/a.adoc"]}}
+    forms = {
+        "forms/a.adoc": "= 様式\n\n備考:: [text]\n備考:: [text]\n"
+    }
+    with pytest.raises(site_mod.SiteError, match="重複"):
+        site_mod.load(_write(tmp_path, cfg, forms))
+
+
+def test_ascii_colon_in_label_is_loud(tmp_path):
+    """ASCII コロン入りラベルは黙って消えず、エラーになる(旧実装と同等)。"""
+    cfg = {"title": "t", "inquiry": {"forms": ["forms/a.adoc"]}}
+    forms = {"forms/a.adoc": "= 様式\n\n納期:目安:: [date]\n"}
+    with pytest.raises(site_mod.SiteError, match="コロン"):
+        site_mod.load(_write(tmp_path, cfg, forms))
