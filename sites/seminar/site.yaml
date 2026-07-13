@@ -1,0 +1,11 @@
+# 実証: seminar-kit(研修・セミナー管理)の申込様式を、コードの追加なしに
+# 様式プロファイルの差し替えだけで表現する(DESIGN.md §15)
+title: 研修・セミナー申込(seminar-kit 実証)
+lang: ja
+
+inquiry:
+  address: seminar@example.jp
+  staff:
+    - {key: jimukyoku, label: 事務局}
+  forms:
+    - forms/moshikomi.adoc

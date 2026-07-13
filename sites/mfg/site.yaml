@@ -1,0 +1,11 @@
+# 実証: mfg-kit(製造業向け見積・受注)の見積依頼を、コードの追加なしに
+# 様式プロファイルの差し替えだけで表現する(DESIGN.md §15)
+title: 見積依頼(mfg-kit 実証)
+lang: ja
+
+inquiry:
+  address: mitsumori@example.jp
+  staff:
+    - {key: eigyo, label: 営業}
+  forms:
+    - forms/mitsumori.adoc
