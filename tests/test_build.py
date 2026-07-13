@@ -125,3 +125,14 @@ def test_adoc_without_pyasciidoc_raises_clear_error(tmp_site, monkeypatch):
     )
     with pytest.raises(build_mod.BuildError, match="pyasciidoc"):
         build_mod.build(tmp_site)
+
+
+def test_forms_sha256_published(tmp_site):
+    """配布様式の SHA-256 が dist/forms/sha256.txt に併記される(§11)。"""
+    import hashlib
+
+    tmp_site.forms_out.mkdir(parents=True)
+    (tmp_site.forms_out / "contact.xlsx").write_bytes(b"dummy")
+    build_mod.build(tmp_site)
+    line = (tmp_site.dist / "forms" / "sha256.txt").read_text(encoding="utf-8")
+    assert line == f"{hashlib.sha256(b'dummy').hexdigest()}  contact.xlsx\n"

@@ -72,7 +72,9 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--branch", default="main")
     sp.add_argument("--dry-run", action="store_true")
 
-    sp = sub.add_parser("forms", help="申込様式 xlsx を forms-out/ へ生成する")
+    sp = sub.add_parser(
+        "forms", help="申込様式(xlsx+記入用テキスト)を forms-out/ へ生成する"
+    )
     sp.add_argument("site")
 
     sp = sub.add_parser("macro", help="様式マクロ(OnlyOffice JS)を出力する")
