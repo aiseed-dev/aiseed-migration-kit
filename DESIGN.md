@@ -836,7 +836,8 @@ Excel(表計算を"アプリ本体"にする使い方)**。移行後は表計算
 aiseed-migration-kit/
   src/amig/          cli / site(設定)/ ingest(取り込み)/
                        classify(分類)/ convert(MD化)/ build(生成)/
-                       publish(cf-publish 呼び出し)/ rules(既定の抽出ルール)
+                       publish(cf-publish 呼び出し)/ rules(既定の抽出ルール)/
+                       decision(決裁部品: 属性解釈・インデックスSQL・凍結記録。§14)
     inquiry/           profile(様式プロファイル解釈)/ spec(SQL 語彙・修復)/
                        derive(DDL・検証モデル・記入テキスト)/
                        forms(xlsx 生成)/ parse(読み取り)/

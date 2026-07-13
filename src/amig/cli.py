@@ -10,6 +10,8 @@
     amig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
     amig ddl <site> [<form>]         PostgreSQL DDL(CREATE TABLE)を出力
     amig mailin <site> [--once]      受付メールの振り分け(IMAP)
+    amig docindex <dir>              決裁文書の属性インデックス(SQL)を出力
+    amig freeze <file> [--source]    交付物の凍結記録(SHA-256+生成元)を作成
 """
 
 import argparse
@@ -85,6 +87,17 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("site")
     sp.add_argument("--once", action="store_true", help="1回だけさらって終了")
 
+    sp = sub.add_parser(
+        "docindex", help="決裁文書(.adoc)の属性インデックス(SQL)を出力する"
+    )
+    sp.add_argument("dir")
+
+    sp = sub.add_parser(
+        "freeze", help="交付物の凍結記録(<file>.hash.yaml)を作成する"
+    )
+    sp.add_argument("file")
+    sp.add_argument("--source", help="生成元の決裁文書(.adoc)")
+
     args = p.parse_args(argv)
     try:
         _run(args)
@@ -102,6 +115,27 @@ def _run(args: argparse.Namespace) -> None:
             (root / d).mkdir(parents=True, exist_ok=True)
         (root / "site.yaml").write_text(NEW_SITE_YAML, encoding="utf-8")
         print(f"作成しました: {root}(site.yaml を編集してください)")
+        return
+
+    # 決裁部品(§14)はサイト設定に依存しない
+    if args.cmd == "docindex":
+        from amig import decision
+
+        root = Path(args.dir)
+        if not root.is_dir():
+            raise site_mod.SiteError(f"{root} はディレクトリではありません")
+        print(decision.index_sql(decision.scan(root)), end="")
+        return
+    if args.cmd == "freeze":
+        from amig import decision
+
+        artifact = Path(args.file)
+        if not artifact.is_file():
+            raise site_mod.SiteError(f"{artifact} がありません")
+        out = decision.freeze(
+            artifact, source=Path(args.source) if args.source else None
+        )
+        print(f"凍結記録を作成: {out}")
         return
 
     site = site_mod.load(args.site)
