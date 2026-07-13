@@ -207,13 +207,15 @@ def build(site: Site) -> int:
     (site.dist / "index.html").write_text(index_t.render(**ctx), encoding="utf-8")
     n += 1
 
-    # 様式 xlsx を公開する(受付アドレスはページに書かず様式の中にだけ。§5)
+    # 様式(xlsx+記入用テキスト)を公開する(受付アドレスはページに書かず
+    # 様式の中にだけ。§5)
     inquiry = site.cfg.get("inquiry") or {}
     if inquiry.get("publish_forms", True) and site.forms_out.exists():
         forms_dir = site.dist / "forms"
         forms_dir.mkdir(parents=True, exist_ok=True)
-        for f in sorted(site.forms_out.glob("*.xlsx")):
-            (forms_dir / f.name).write_bytes(f.read_bytes())
+        for pat in ("*.xlsx", "*.txt"):
+            for f in sorted(site.forms_out.glob(pat)):
+                (forms_dir / f.name).write_bytes(f.read_bytes())
 
     if site.public.exists():
         shutil.copytree(site.public, site.dist, dirs_exist_ok=True)

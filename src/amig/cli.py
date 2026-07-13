@@ -6,8 +6,9 @@
     amig convert <site> [--force]    記事を content/*.md へ機械変換
     amig build <site>                dist/ を生成
     amig publish <site> [--dry-run]  Cloudflare Pages へ配信
-    amig forms <site>                申込様式 xlsx を forms-out/ へ生成
+    amig forms <site>                申込様式(xlsx+記入テキスト)を forms-out/ へ生成
     amig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
+    amig ddl <site> [<form>]         PostgreSQL DDL(CREATE TABLE)を出力
     amig mailin <site> [--once]      受付メールの振り分け(IMAP)
 """
 
@@ -32,19 +33,14 @@ categories:
   news: お知らせ
 
 # 問い合わせを使うときに設定する。様式は build で dist/forms/ に公開される。
-# 受付アドレスはページに書かれず、様式の中にだけ入る
+# 受付アドレスはページに書かれず、様式の中にだけ入る。
+# 様式の定義は forms/*.adoc(様式プロファイル。sites/example/forms/ 参照)
 # inquiry:
 #   address: uketsuke@example.jp
 #   staff:
 #     - {key: general, label: 総合窓口}
 #   forms:
-#     - key: contact
-#       label: お問い合わせ
-#       fields:
-#         - {key: company, label: ご所属, required: true, example: 株式会社○○}
-#         - {key: person, label: お名前, required: true, example: 山田 太郎}
-#         - {key: email, label: メールアドレス, required: true}
-#         - {key: message, label: ご用件, required: true}
+#     - forms/contact.adoc
 """
 
 
@@ -80,6 +76,10 @@ def main(argv: list[str] | None = None) -> None:
     sp = sub.add_parser("macro", help="様式マクロ(OnlyOffice JS)を出力する")
     sp.add_argument("site")
     sp.add_argument("form")
+
+    sp = sub.add_parser("ddl", help="PostgreSQL DDL(CREATE TABLE)を出力する")
+    sp.add_argument("site")
+    sp.add_argument("form", nargs="?", help="省略時は全様式")
 
     sp = sub.add_parser("mailin", help="受付メールを担当フォルダへ振り分ける")
     sp.add_argument("site")
@@ -127,6 +127,11 @@ def _run(args: argparse.Namespace) -> None:
         from amig.inquiry import forms as forms_mod
 
         print(forms_mod.macro_js(site, site.form(args.form)))
+    elif args.cmd == "ddl":
+        from amig.inquiry import derive
+
+        targets = [site.form(args.form)] if args.form else list(site.forms)
+        print("\n".join(derive.ddl(f) for f in targets), end="")
     elif args.cmd == "mailin":
         from amig.inquiry import mailin
 
@@ -134,6 +139,7 @@ def _run(args: argparse.Namespace) -> None:
 
 
 def _forms(site: site_mod.Site) -> None:
+    from amig.inquiry import derive
     from amig.inquiry import forms as forms_mod
 
     addr = str((site.cfg.get("inquiry") or {}).get("address") or "")
@@ -148,7 +154,9 @@ def _forms(site: site_mod.Site) -> None:
         wb = forms_mod.build(site, form, addr)
         out = site.forms_out / f"{form.key}.xlsx"
         wb.save(out)
-        print(f"様式を生成: {out}({form.label})")
+        txt = site.forms_out / f"{form.key}.txt"
+        txt.write_text(derive.filltext(site, form, addr), encoding="utf-8")
+        print(f"様式を生成: {out} / {txt.name}({form.label})")
     print(
         "次回の build で dist/forms/ に公開されます"
         "(受付アドレスはページに書かず、様式の中にだけ入っています)"

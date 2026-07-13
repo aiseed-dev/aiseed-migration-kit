@@ -5,8 +5,11 @@
   parse_text(body, site) メール本文の送信用テキスト(`項目: 値`。様式内蔵の
                          マクロ・数式が生成する。厳密な YAML ではなく
                          行単位で寛容に読む——メールソフトの改行に耐える)
-どちらも同じ検証(_assemble)に合流する。不備は Invalid(issues つき。
-申込者向けの修正依頼文にそのまま使える日本語)を送出する。
+どちらも同じ検証(_assemble)に合流する。処理順は DESIGN.md §5「受信
+パーサーの寛容性」のとおり: NFKC 正規化+修復(spec.repair。制約から
+導出できる決定的な変換のみ)→ 制約検証(様式プロファイル由来の Pydantic
+モデル)。不備は Invalid(issues つき。申込者向けの修正依頼文にそのまま
+使える日本語)を送出する——呼び出し側(mailin)が pending へ落とす。
 """
 
 import io
@@ -18,18 +21,23 @@ from typing import BinaryIO
 
 from openpyxl import load_workbook
 from openpyxl.workbook import Workbook
+from pydantic import ValidationError
 
-from amig.inquiry import forms
+from amig.inquiry import derive, forms, spec
 from amig.site import FormDef, Site, Staff
 
 
 @dataclass(frozen=True)
 class Inquiry:
-    """様式から読み取った1件分(検証済み)。"""
+    """様式から読み取った1件分(検証済み)。
+
+    values は項目ラベル(=DDL の列名)→ 修復済みの値。修復(NFKC・和暦
+    → ISO 等)が入っても原文はメール原文(IMAP)が証跡として残る。
+    """
 
     form: FormDef
     staff: Staff
-    values: dict[str, str]  # field key → 値(未記入の任意欄は含まない)
+    values: dict[str, str]  # 項目ラベル → 値(未記入の任意欄は含まない)
 
 
 class Invalid(Exception):
@@ -69,14 +77,50 @@ def _assemble(value_of: Callable[[str], str | None], site: Site) -> Inquiry:
     for f in form.fields:
         v = value_of(f"f_{f.key}")
         if v is not None:
-            values[f.key] = v
+            values[f.label] = spec.repair(f.spec, v)
         elif f.required:
             issues.append(f"「{f.label}」が未記入です")
 
+    issues += _validate(form, values)
     if issues:
         raise Invalid(issues)
     assert staff is not None
     return Inquiry(form=form, staff=staff, values=values)
+
+
+_ERR_JA = {
+    "string_too_long": "文字数が多すぎます",
+    "literal_error": "選択肢のいずれかを記入してください",
+    "int_parsing": "半角数字で記入してください",
+    "int_type": "半角数字で記入してください",
+    "greater_than_equal": "範囲より小さい値です",
+    "less_than_equal": "範囲より大きい値です",
+    "date_from_datetime_parsing": "日付の形式で記入してください(例: 2026-07-13)",
+    "date_parsing": "日付の形式で記入してください(例: 2026-07-13)",
+    "string_pattern_mismatch": "形式が正しくないようです",
+}
+
+
+def _validate(form: FormDef, values: dict[str, str]) -> list[str]:
+    """制約検証(様式プロファイルから派生した Pydantic モデル。正の検証)。
+
+    未記入(required)は呼び出し側が先に検出しているため、ここでは
+    記入された値の制約違反だけを日本語の issue にする。
+    """
+    try:
+        derive.model(form).model_validate(values)
+    except ValidationError as e:
+        key_to_label = {f.key: f.label for f in form.fields}
+        issues = []
+        for err in e.errors():
+            loc = str(err["loc"][0]) if err["loc"] else ""
+            label = key_to_label.get(loc, loc)
+            if label not in values:
+                continue  # 未記入は上で報告済み
+            reason = _ERR_JA.get(err["type"], "記入内容をご確認ください")
+            issues.append(f"「{label}」: {reason}")
+        return issues
+    return []
 
 
 def _match_staff(label: str | None, staff: tuple[Staff, ...]) -> Staff | None:

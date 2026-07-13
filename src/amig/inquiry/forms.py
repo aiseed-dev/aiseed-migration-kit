@@ -1,9 +1,10 @@
-"""申込様式 xlsx の生成(神Excel を機械可読に設計する)。
+"""申込様式 xlsx の生成(様式プロファイルからの派生物の一つ)。
 
-様式の定義は site.yaml の inquiry.forms が正。名前付きセルの座標はこの
-モジュールに閉じ、他の場所でハードコードしない(読み取り parse.py も
-ここの names() を参照する)。Excel の定義名にハイフンは使えないため、
-定義名のみアンダースコアを使う。
+様式の唯一の定義は様式プロファイル(AsciiDoc。DESIGN.md §5)で、xlsx は
+そこから生成される記入チャネル。名前付きセルの座標はこのモジュールに
+閉じ、他の場所でハードコードしない(読み取り parse.py もここの names() を
+参照する)。Excel の定義名にハイフンは使えないため、定義名のみ
+アンダースコアを使う。
 
 様式は公開サイトからダウンロードできる(build が dist/forms/ に載せる)。
 受付アドレスはページ本文に書かず、様式の中にだけ置く(ボット収集対策。
@@ -55,7 +56,10 @@ _BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
 
 
 def _draw(ws: Worksheet, site: Site, form: FormDef, note: str) -> int:
-    """レイアウトを描き、案内文の行番号を返す(記入シート・記入例で共通)。"""
+    """レイアウトを描き、案内文の行番号を返す。
+
+    E 列は項目の補足(様式プロファイルの自由記述)。機械は読まない。
+    """
     ws["A1"] = form.label
     ws["A1"].font = Font(size=16, bold=True)
     ws["A2"] = site.title
@@ -70,18 +74,28 @@ def _draw(ws: Worksheet, site: Site, form: FormDef, note: str) -> int:
         cell.fill = _FILL_INPUT
         cell.border = _BORDER
         cell.alignment = Alignment(wrap_text=True, vertical="top")
+        hints = []
+        if f.spec.choices:
+            hints.append(" / ".join(f.spec.choices) + " から選択")
+        if f.note:
+            hints.append(f.note.replace("\n", " "))
+        if hints:
+            e = ws[f"E{row}"]
+            e.value = " ".join(hints)
+            e.font = Font(size=9, color="666666")
+            e.alignment = Alignment(wrap_text=True, vertical="top")
     note_row = _FIELD_ROW0 + len(form.fields) + 1
     ws[f"A{note_row}"] = note
     ws.column_dimensions["A"].width = 22
     ws.column_dimensions["C"].width = 60
+    ws.column_dimensions["E"].width = 30
     ws.print_area = f"A1:F{note_row}"
     ws.page_setup.fitToWidth = 1
     return note_row
 
 
 def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
-    """様式を組み立てる(1枚目=記入シート、2枚目=送信用テキスト、
-    記入例は example のある様式のみ3枚目)。
+    """様式を組み立てる(1枚目=記入シート、2枚目=送信用テキスト)。
 
     submit_addr は受付アドレス。様式にだけ書き、公開ページの本文には載せない。
     """
@@ -116,6 +130,19 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
     ws.add_data_validation(dv)
     dv.add(ws[n["staff"]])
 
+    # 選択肢(check in)のある項目もドロップダウン(制約から派生)
+    for f in form.fields:
+        if f.spec.choices:
+            fdv = DataValidation(
+                type="list",
+                formula1='"' + ",".join(f.spec.choices) + '"',
+                allow_blank=True,
+                showErrorMessage=True,
+                error="リストから選んでください",
+            )
+            ws.add_data_validation(fdv)
+            fdv.add(ws[n[f"f_{f.key}"]])
+
     # 入力セル以外はシート保護
     for name, coord in n.items():
         if name not in ("form_kind", "form_ver"):
@@ -123,8 +150,6 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
     ws.protection.sheet = True
 
     _text_sheet(wb, form, submit_addr)
-    if any(f.example for f in form.fields):
-        _example(wb, site, form, note)
     return wb
 
 
@@ -164,18 +189,6 @@ def _text_sheet(wb: Workbook, form: FormDef, submit_addr: str) -> None:
     ws.column_dimensions["A"].width = 90
 
 
-def _example(wb: Workbook, site: Site, form: FormDef, note: str) -> None:
-    """記入例シート。迷わせないための見本で、機械読み取りはしない。"""
-    ws = wb.create_sheet("記入例")
-    _draw(ws, site, form, note)
-    if site.staff:
-        ws[f"C{_STAFF_ROW}"] = site.staff[0].label
-    for i, f in enumerate(form.fields):
-        if f.example:
-            ws[f"C{_FIELD_ROW0 + i}"] = f.example
-    ws.protection.sheet = True
-
-
 def macro_js(site: Site, form: FormDef) -> str:
     """様式内蔵マクロ(OnlyOffice JavaScript)を様式定義から生成する。
 
@@ -183,7 +196,7 @@ def macro_js(site: Site, form: FormDef) -> str:
     OnlyOffice 利用者向けの補助で、未記入チェックのうえ C 列の1セルに
     本文をまとめて一括コピーしやすくする。
     出力: `amig macro <site> <form>`。チェック定義はサーバー側の検証
-    (parse)と同じ site.yaml から生成されるため、様式を変えたら再生成する。
+    (parse)と同じ様式プロファイルから生成されるため、様式を変えたら再生成する。
     """
     n = names(form)
     keys = text_keys(form)
@@ -193,8 +206,8 @@ def macro_js(site: Site, form: FormDef) -> str:
     )
     return f"""// 様式マクロ({form.label}): 未記入チェックのうえ、送信用テキストを
 // 「{TEXT_SHEET}」シートに書き出す。OnlyOffice(Desktop / Docs)専用。
-// このファイルは自動生成(amig macro)——手で直さず、site.yaml を直して再生成する
-// チェック定義はサーバー側の検証(parse)と同じ site.yaml から生成される
+// このファイルは自動生成(amig macro)——手で直さず、様式プロファイル(.adoc)を直して再生成する
+// チェック定義はサーバー側の検証(parse)と同じ様式プロファイルから生成される
 (function () {{
   var src = Api.GetSheet("{SHEET}");
   var out = Api.GetSheet("{TEXT_SHEET}");

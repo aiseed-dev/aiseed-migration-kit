@@ -12,22 +12,6 @@ inquiry:
     - {key: general, label: 総合窓口}
     - {key: shiken, label: 依頼試験}
     - {key: setsubi, label: 設備利用}
-  forms:
-    - key: contact
-      label: お問い合わせ
-      fields:
-        - {key: company, label: ご所属(企業・団体名), required: true, example: 株式会社○○製作所}
-        - {key: person, label: お名前, required: true, example: 山田 太郎}
-        - {key: tel, label: 電話番号, required: true, example: 088-000-0000}
-        - {key: email, label: メールアドレス, required: true, example: taro@example.co.jp}
-        - {key: message, label: ご用件, required: true, example: ○○の試験についてご相談したい}
-    - key: shiken
-      label: 依頼試験申込
-      fields:
-        - {key: company, label: 企業・団体名, required: true, example: 株式会社○○製作所}
-        - {key: person, label: ご担当者名, required: true, example: 山田 太郎}
-        - {key: tel, label: 電話番号, required: true, example: 088-000-0000}
-        - {key: email, label: メールアドレス, required: true, example: taro@example.co.jp}
-        - {key: item, label: 試験項目, required: true, example: 引張試験}
-        - {key: qty, label: 数量, required: true, example: 3本}
-        - {key: note, label: 備考}
+  forms:                           # 様式プロファイル(.adoc)= 様式の唯一の定義
+    - forms/contact.adoc
+    - forms/shiken.adoc

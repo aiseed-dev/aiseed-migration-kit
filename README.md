@@ -62,12 +62,16 @@ amig publish sites/mysite        # Cloudflare Pages へ配信(運用判断で実
 ### 問い合わせ(申込様式+メール受付)
 
 ```bash
-amig forms sites/mysite            # 様式 xlsx を forms-out/ へ生成
+amig forms sites/mysite            # 様式(xlsx+記入用テキスト)を forms-out/ へ生成
 amig macro sites/mysite contact    # 様式マクロ(OnlyOffice JS)を出力
+amig ddl sites/mysite              # PostgreSQL DDL(CREATE TABLE)を出力
 amig mailin sites/mysite --once    # 受付メールを担当フォルダへ振り分け
 ```
 
-- 様式の定義は site.yaml の inquiry.forms(神Excel=唯一のフォーム定義)
+- 様式の唯一の定義は **様式プロファイル**(`forms/*.adoc`。AsciiDoc の
+  ラベル付きリスト+SQL 語彙の制約。sites/example/forms/ 参照)。site.yaml の
+  inquiry.forms はプロファイルへのパスの列。xlsx・記入用テキスト・DDL・
+  検証モデルはすべて同じ定義から派生する(DESIGN.md §5)
 - **様式は公開サイトからダウンロードできる**(build が forms-out/ を
   dist/forms/ に載せる。`inquiry: {publish_forms: false}` で非公開にもできる)
 - **受付アドレスはページ本文に書かず、様式の中にだけ**置く(ボット収集対策。
@@ -90,7 +94,9 @@ amig build sites/example && python -m http.server -d sites/example/dist 8000
 
 ```
 src/amig/       ingest / classify / convert / build / publish / cli
-  inquiry/        forms(様式生成)/ parse(読み取り)/ mailin(振り分け)/ mail(送信)
+  inquiry/        profile(様式プロファイル解釈)/ spec(SQL 語彙・修復)/
+                  derive(DDL・検証モデル・記入テキスト)/ forms(xlsx 生成)/
+                  parse(読み取り)/ mailin(振り分け)/ mail(送信)
   templates/      既定テンプレート(サイトの templates/ で上書き可)
 vendor/cf-publish/  Cloudflare 配信(同梱。PyPI 公開までの暫定)
 sites/example/      出力例(そのまま build できる)

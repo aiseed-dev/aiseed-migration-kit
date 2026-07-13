@@ -2,6 +2,8 @@
 
 sites/<name>/
   site.yaml   サイト設定(このモジュールが読む)
+  forms/      様式プロファイル .adoc(様式の唯一の定義。site.yaml の
+              inquiry.forms がパスで参照する)
   rules.py    サイト固有の抽出ルール(無ければ既定 amig.rules)
   source/     取り込んだ元データ(raw/・manifest.yaml・classified.yaml)
   content/    記事 .md(編集の正。convert は既存を上書きしない)
@@ -39,27 +41,37 @@ class Staff:
 
 @dataclass(frozen=True)
 class Field:
-    """様式の記入欄1つ。"""
+    """様式の記入欄1つ(様式プロファイルの解釈結果)。
+
+    key は Excel の定義名用に位置から機械生成する(c1, c2, ...)。項目の
+    同一性は label(=DDL の列名)が担い、key は xlsx の読み書きに閉じる。
+    """
 
     key: str
     label: str
-    required: bool = False
-    example: str = ""
+    spec: Any  # amig.inquiry.spec.FieldSpec(循環importを避けて Any)
+    note: str = ""  # 表示用の自由記述(様式プロファイルの本文。機械は読まない)
+
+    @property
+    def required(self) -> bool:
+        return bool(self.spec.required)
 
 
 @dataclass(frozen=True)
 class FormDef:
-    """申込様式1種類(用途別)。site.yaml の inquiry.forms が正。"""
+    """申込様式1種類(用途別)。様式プロファイル(AsciiDoc)が唯一の定義で、
+    site.yaml の inquiry.forms はプロファイルへのパスの列(DESIGN.md §5)。"""
 
     key: str
     label: str
+    intro: str
     fields: tuple[Field, ...]
 
-    def field(self, key: str) -> Field:
+    def field(self, label: str) -> Field:
         for f in self.fields:
-            if f.key == key:
+            if f.label == label:
                 return f
-        raise KeyError(key)
+        raise KeyError(label)
 
 
 @dataclass(frozen=True)
@@ -145,7 +157,7 @@ class Site:
     @property
     def forms(self) -> tuple[FormDef, ...]:
         items = (self.cfg.get("inquiry") or {}).get("forms") or []
-        return tuple(_form_def(it) for it in items)
+        return tuple(_form_def(self.root, it) for it in items)
 
     def form(self, key: str) -> FormDef:
         for f in self.forms:
@@ -176,30 +188,39 @@ def _check_key(key: str, where: str) -> None:
         raise SiteError(f"{where} は英小文字・数字・_ で指定してください(先頭は英字)")
 
 
-def _form_def(it: dict[str, Any]) -> FormDef:
-    key = str(it["key"])
-    _check_key(key, f"inquiry.forms の key「{key}」")
+def _form_def(root: Path, it: Any) -> FormDef:
+    """様式プロファイル(.adoc)を読み込み FormDef にする。
+
+    it は site.yaml の inquiry.forms の1要素=プロファイルへの相対パス。
+    様式 key はファイル名(拡張子なし)。
+    """
+    from amig.inquiry import profile, spec
+
+    path = root / str(it)
+    key = path.stem
+    _check_key(key, f"様式ファイル名「{path.name}」の key「{key}」")
+    if not path.exists():
+        raise SiteError(f"様式プロファイル {path} がありません")
+    try:
+        prof = profile.parse(path.read_text(encoding="utf-8"))
+    except profile.ProfileError as e:
+        raise SiteError(f"様式「{key}」({path.name}): {e}") from None
+
     fields = []
-    for f in it.get("fields") or []:
-        fkey = str(f["key"])
-        _check_key(fkey, f"様式「{key}」の欄 key「{fkey}」")
-        label = str(f["label"])
-        if ":" in label or ":" in label:
+    for i, pf in enumerate(prof.fields):
+        if ":" in pf.label or "：" in pf.label:
             raise SiteError(
-                f"様式「{key}」の欄ラベル「{label}」にコロンは使えません"
+                f"様式「{key}」の項目「{pf.label}」にコロンは使えません"
                 "(送信用テキストの区切りと衝突するため)"
             )
-        fields.append(
-            Field(
-                key=fkey,
-                label=label,
-                required=bool(f.get("required", False)),
-                example=str(f.get("example", "")),
-            )
-        )
-    if not fields:
-        raise SiteError(f"様式「{key}」に fields がありません")
-    return FormDef(key=key, label=str(it["label"]), fields=tuple(fields))
+        try:
+            sp = spec.parse(pf.label, pf.constraint)
+        except spec.SpecError as e:
+            raise SiteError(f"様式「{key}」({path.name}): {e}") from None
+        fields.append(Field(key=f"c{i + 1}", label=pf.label, spec=sp, note=pf.note))
+    return FormDef(
+        key=key, label=prof.title, intro=prof.intro, fields=tuple(fields)
+    )
 
 
 def load(root: str | Path) -> Site:

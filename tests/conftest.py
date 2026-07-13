@@ -25,19 +25,15 @@ def tmp_site(tmp_path: Path) -> site_mod.Site:
         "inquiry": {
             "address": "uketsuke@example.jp",
             "staff": [{"key": "general", "label": "総合窓口"}],
-            "forms": [
-                {
-                    "key": "contact",
-                    "label": "お問い合わせ",
-                    "fields": [
-                        {"key": "person", "label": "お名前", "required": True},
-                        {"key": "note", "label": "備考"},
-                    ],
-                }
-            ],
+            "forms": ["forms/contact.adoc"],
         },
     }
     (root / "site.yaml").write_text(
         yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8"
+    )
+    (root / "forms").mkdir()
+    (root / "forms" / "contact.adoc").write_text(
+        "= お問い合わせ\n\nお名前:: [varchar(50), not null]\n備考:: [text]\n",
+        encoding="utf-8",
     )
     return site_mod.load(root)

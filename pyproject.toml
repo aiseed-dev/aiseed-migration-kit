@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "markdownify>=0.13",
     "openpyxl>=3.1",
+    "pydantic>=2",
 ]
 
 [project.urls]
