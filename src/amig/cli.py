@@ -120,7 +120,7 @@ def _run(args: argparse.Namespace) -> None:
         root = Path(args.site)
         if (root / "site.yaml").exists():
             raise site_mod.SiteError(f"{root}/site.yaml は既にあります")
-        for d in ("content", "data", "public"):
+        for d in ("content", "data", "public", "forms"):
             (root / d).mkdir(parents=True, exist_ok=True)
         (root / "site.yaml").write_text(NEW_SITE_YAML, encoding="utf-8")
         print(f"作成しました: {root}(site.yaml を編集してください)")
