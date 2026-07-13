@@ -27,21 +27,21 @@ source .venv/bin/activate
 cf-publish は同梱(vendor/。PyPI 公開後は通常の `pip install cf-publish` に
 切り替える)。日本語 Markdown の改行・強調を良くする
 [mdit-py-cjk-friendly](https://github.com/aiseed-dev/mdit-py-cjk-friendly)
-があれば自動で使う(無くても動く):
+（PyPI公開済）があれば自動で使う(無くても動く):
 
 ```bash
-pip install git+https://github.com/aiseed-dev/mdit-py-cjk-friendly
+pip install mdit-py-cjk-friendly
 ```
 
 `content/` に `.adoc`(AsciiDoc)ファイルを置くと
-[pyasciidoc](https://github.com/aiseed-dev/pyasciidoc)で変換される
-(CJK対応の見出し・強調。既存のPython AsciiDoc実装は和文隣接の強調記法を
-認識しないため、mdit-py-cjk-friendlyの境界判定を土台に新規実装したもの。
-`.md`と違い代替レンダラが無いため、未導入で`.adoc`を使うとビルド時に
-分かりやすいエラーになる):
+[pyasciidoc](https://github.com/aiseed-dev/pyasciidoc)（PyPI公開済）で
+変換される(CJK対応の見出し・強調・admonition・箇条書き。既存のPython
+AsciiDoc実装は和文隣接の強調記法を認識しないため、mdit-py-cjk-friendly
+の境界判定を土台に新規実装したもの。`.md`と違い代替レンダラが無いため、
+未導入で`.adoc`を使うとビルド時に分かりやすいエラーになる):
 
 ```bash
-pip install git+https://github.com/aiseed-dev/pyasciidoc
+pip install pyasciidoc
 ```
 
 ## 使い方
@@ -97,3 +97,11 @@ sites/example/      出力例(そのまま build できる)
 ```
 
 ライセンス: AGPL-3.0
+
+AGPL を選ぶ理由: 本キットはネットワーク越しにサービス化して使う場面
+(SaaS 化・再配布)を想定しておらず、そこで生じうる「改変して配布・提供
+しても差分を公開しない」を防ぐのが AGPL の役割である。組織が自組織の
+サイト・業務のために社内で導入・改変して使うだけであれば、外部へ配布・
+サービス提供しない限り、AGPL のソース公開義務は発生しない(社内利用は
+「配布」にあたらない)。中小組織(SME)が自組織の運用のためだけに使う
+通常の利用では、追加の法的義務を負わない。
