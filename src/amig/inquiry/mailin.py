@@ -12,6 +12,11 @@ pending=未処理)。DB は持たない。機械で裁けないものは必ず p
   (b) xlsx 添付あり → 同上(添付はフォールバック経路)
   (c) 不備(様式由来だが読み取れない)→ 修正依頼を自動返信して pending へ
   (d) 様式由来でない → **自動返信せず** pending へ(逆流防止)
+
+pending の一次処理(§7「AI の持ち場」): (c) のとき、ローカル LLM が
+設定されていれば(amig.llm)、解釈案メールを pending に並べて置く。
+AI は提案まで——解釈案は人が読む下書きであり、登録・返信には使われない。
+LLM 未設定なら何も足さない(人がそのまま処理する)。
 """
 
 import email
@@ -128,6 +133,45 @@ def handle(site: Site, raw: bytes) -> tuple[str, tuple[str, str, str] | None]:
     return inq.staff.folder, (sender, subject, text)
 
 
+def propose(site: Site, raw: bytes) -> bytes | None:
+    """pending 落ちした様式由来メールの解釈案(メール形式)を作る。
+
+    ローカル LLM(amig.llm)が未設定・失敗なら None(何も足さない)。
+    解釈案は AI の提案であり、登録・自動返信には使われない——pending
+    フォルダで原文の隣に置かれ、人が確認するための下書きに徹する。
+    """
+    from amig.inquiry import derive, forms
+    from amig import llm
+
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    body = body_text(msg)
+    # 「様式:」行から対象の様式を特定する(特定できなければ提案しない)
+    kind = None
+    for line in body.splitlines():
+        m = parse._LINE_RE.match(line.lstrip('> "'))
+        if m and m.group(1).strip() == forms.KEY_KIND:
+            kind = m.group(2).strip()
+            break
+    form = next((f for f in site.forms if f.key == kind), None)
+    if form is None:
+        return None
+
+    answer = llm.complete(derive.prompt(form, body))
+    if not answer:
+        return None
+
+    note = EmailMessage()
+    note["From"] = "amig <noreply@localhost>"
+    note["Subject"] = f"【解釈案】{msg.get('Subject', '(件名なし)')}"
+    if msg.get("Message-ID"):
+        note["In-Reply-To"] = msg["Message-ID"]
+    note.set_content(
+        "ローカルAIによる解釈案です(提案であり、登録・返信には使われて\n"
+        "いません)。原文と突き合わせて確認してください。\n\n" + answer
+    )
+    return note.as_bytes()
+
+
 # ---- IMAP(受信箱=キュー) ----
 
 
@@ -162,6 +206,10 @@ class ImapBox:
         self.conn.uid("store", uid, "+FLAGS", r"(\Deleted)")
         self.conn.expunge()
 
+    def append(self, folder: str, raw: bytes) -> None:
+        """folder にメールを1通追加する(解釈案の並置に使う)。"""
+        self.conn.append(folder, "", imaplib.Time2Internaldate(time.time()), raw)
+
     def close(self) -> None:
         self.conn.logout()
 
@@ -179,6 +227,13 @@ def poll_once(box: ImapBox, site: Site, mailer: mail.Mailer) -> dict[str, int]:
             folder = box.cfg.pending
         box.move(uid, folder)
         counts[folder] = counts.get(folder, 0) + 1
+        if folder == box.cfg.pending:
+            try:  # 解釈案(LLM 未設定なら None。失敗しても受付は止めない)
+                note = propose(site, raw)
+                if note is not None:
+                    box.append(box.cfg.pending, note)
+            except Exception:
+                log.exception("解釈案の生成に失敗(uid=%s)。原文のみ", uid)
     return counts
 
 

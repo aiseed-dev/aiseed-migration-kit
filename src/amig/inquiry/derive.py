@@ -4,6 +4,7 @@
   ddl(form)       PostgreSQL DDL(CREATE TABLE)
   model(form)     Pydantic 検証モデル(受信パーサーが使う。正の検証)
   filltext(form)  記入用プレーンテキスト(画面コピペ・メール返信チャネル)
+  prompt(form)    AI 用プロンプト(pending の解釈案。§7「AI の持ち場」)
 
 xlsx(forms.py)・マクロ(forms.macro_js)も同じ FormDef から生成される。
 制約(SQL 語彙)が最初に確定し、以降の派生はすべてそれに従属する——
@@ -92,6 +93,7 @@ def filltext(site: Site, form: FormDef, submit_addr: str) -> str:
         "",
         f"{forms.KEY_KIND}: {form.key}",
         f"{forms.KEY_VER}: {forms.FORM_VER}",
+        f"{forms.KEY_SITE}: {site.name}",
         f"{forms.KEY_STAFF}: ",
     ]
     if site.staff:
@@ -108,4 +110,38 @@ def filltext(site: Site, form: FormDef, submit_addr: str) -> str:
         if notes:
             lines.append("※" + " ".join(notes))
     lines.append("")
+    return "\n".join(lines)
+
+
+PROMPT_BODY_MARK = "(ここに受信メール本文を貼る)"
+
+
+def prompt(form: FormDef, body: str | None = None) -> str:
+    """pending 解釈用の AI プロンプト(派生物の5点目。§7「AI の持ち場」)。
+
+    修復不能・検証落ちの受信本文から「解釈案」を作らせる。AI は提案まで
+    ——出力は人が読む解釈案であり、登録(DB)には決して直接使わない。
+    制約は様式プロファイルから機械的に列挙されるため、プロンプトと
+    サーバー検証が食い違わない。body 省略時は貼り付け位置の目印を置く
+    (`amig prompt` で出力して手元の LLM に使う用)。
+    """
+    lines = [
+        f"あなたは受付事務の補助者です。様式「{form.label}」で送られたはずの",
+        "メール本文が機械で読み取れませんでした。本文から各項目の値を推定し、",
+        "解釈案を作ってください。",
+        "",
+        "ルール:",
+        "- これは人間の担当者が確認するための提案です。推測で値を作らない",
+        "- 本文に根拠のない項目は出力せず、末尾に「不明: 項目名」と列挙する",
+        "- 出力は「項目名: 値」を1行1項目で。前置き・説明文は書かない",
+        "- 各行の根拠(本文のどの部分か)を行末に # 根拠: … で添える",
+        "",
+        "項目と制約(値は制約を満たす形に正規化する):",
+    ]
+    for f in form.fields:
+        req = "必須" if f.required else "任意"
+        lines.append(f"- {f.label}({req}): [{f.spec.sql}]")
+        if f.note:
+            lines.append(f"  補足: {f.note.replace(chr(10), ' ')}")
+    lines += ["", "受信本文:", body if body is not None else PROMPT_BODY_MARK, ""]
     return "\n".join(lines)

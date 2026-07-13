@@ -84,3 +84,14 @@ def test_filltext_guidance_lines_are_ignored_by_parser(example):
     for line in text.splitlines():
         if line.startswith("※"):
             assert ":" not in line.split("※")[1][:20] or "例" in line
+
+
+def test_prompt_lists_constraints(example):
+    """AI 用プロンプト(派生5点目)は制約を機械的に列挙し、提案に徹する。"""
+    form = example.form("shiken")
+    p = derive.prompt(form)
+    assert "試験項目(必須): [varchar(50), not null, check (試験項目 in ('引張試験', '硬さ試験', '成分分析'))]" in p
+    assert "備考(任意): [text]" in p
+    assert "提案" in p  # 登録ではなく提案であることが明記される
+    assert derive.PROMPT_BODY_MARK in p
+    assert derive.PROMPT_BODY_MARK not in derive.prompt(form, "本文テキスト")

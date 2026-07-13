@@ -31,12 +31,18 @@ STAFF_LABEL = "宛先(担当)"
 # 送信用テキストの固定項目名(→ parse.parse_text が同じ表で読む)
 KEY_KIND = "様式"
 KEY_VER = "様式版"
+KEY_SITE = "受付"  # site.yaml 由来の識別子(偽様式対策。受付側で照合。§11)
 KEY_STAFF = "宛先"
 
 
 def names(form: FormDef) -> dict[str, str]:
     """定義名 → セル座標(様式の機械可読部の全リスト)。"""
-    n = {"form_kind": "H1", "form_ver": "H2", "staff": f"C{_STAFF_ROW}"}
+    n = {
+        "form_kind": "H1",
+        "form_ver": "H2",
+        "form_site": "H3",
+        "staff": f"C{_STAFF_ROW}",
+    }
     for i, f in enumerate(form.fields):
         n[f"f_{f.key}"] = f"C{_FIELD_ROW0 + i}"
     return n
@@ -44,7 +50,12 @@ def names(form: FormDef) -> dict[str, str]:
 
 def text_keys(form: FormDef) -> dict[str, str]:
     """定義名 → 送信用テキストの項目名(メール本文の `項目: 値` の左側)。"""
-    keys = {"form_kind": KEY_KIND, "form_ver": KEY_VER, "staff": KEY_STAFF}
+    keys = {
+        "form_kind": KEY_KIND,
+        "form_ver": KEY_VER,
+        "form_site": KEY_SITE,
+        "staff": KEY_STAFF,
+    }
     for f in form.fields:
         keys[f"f_{f.key}"] = f.label
     return keys
@@ -113,6 +124,7 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
     n = names(form)
     ws[n["form_kind"]] = form.key
     ws[n["form_ver"]] = FORM_VER
+    ws[n["form_site"]] = site.name  # 識別子(偽様式対策。受付側で照合)
     ws.column_dimensions["H"].hidden = True
 
     for name, coord in n.items():
@@ -145,7 +157,7 @@ def build(site: Site, form: FormDef, submit_addr: str) -> Workbook:
 
     # 入力セル以外はシート保護
     for name, coord in n.items():
-        if name not in ("form_kind", "form_ver"):
+        if name not in ("form_kind", "form_ver", "form_site"):
             ws[coord].protection = Protection(locked=False)
     ws.protection.sheet = True
 

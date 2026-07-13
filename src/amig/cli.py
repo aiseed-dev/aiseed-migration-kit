@@ -9,6 +9,7 @@
     amig forms <site>                申込様式(xlsx+記入テキスト)を forms-out/ へ生成
     amig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
     amig ddl <site> [<form>]         PostgreSQL DDL(CREATE TABLE)を出力
+    amig prompt <site> <form>        pending 解釈用の AI プロンプトを出力
     amig mailin <site> [--once]      受付メールの振り分け(IMAP)
     amig docindex <dir>              決裁文書の属性インデックス(SQL)を出力
     amig freeze <file> [--source]    交付物の凍結記録(SHA-256+生成元)を作成
@@ -84,6 +85,12 @@ def main(argv: list[str] | None = None) -> None:
     sp = sub.add_parser("ddl", help="PostgreSQL DDL(CREATE TABLE)を出力する")
     sp.add_argument("site")
     sp.add_argument("form", nargs="?", help="省略時は全様式")
+
+    sp = sub.add_parser(
+        "prompt", help="pending 解釈用の AI プロンプトを出力する(§7)"
+    )
+    sp.add_argument("site")
+    sp.add_argument("form")
 
     sp = sub.add_parser("mailin", help="受付メールを担当フォルダへ振り分ける")
     sp.add_argument("site")
@@ -168,6 +175,10 @@ def _run(args: argparse.Namespace) -> None:
 
         targets = [site.form(args.form)] if args.form else list(site.forms)
         print("\n".join(derive.ddl(f) for f in targets), end="")
+    elif args.cmd == "prompt":
+        from amig.inquiry import derive
+
+        print(derive.prompt(site.form(args.form)))
     elif args.cmd == "mailin":
         from amig.inquiry import mailin
 

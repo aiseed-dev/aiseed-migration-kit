@@ -60,3 +60,56 @@ def test_no_sender(example):
     folder, reply = mailin.handle(example, msg.as_bytes())
     assert folder == mailin.PENDING
     assert reply is None
+
+
+def test_wrong_site_identifier_rejected(example):
+    """識別子(受付:)が本受付と違う様式は弾く(偽様式対策。§11)。"""
+    body = _text(example).replace("様式版: 1", "様式版: 1\n受付: yoso-no-site")
+    folder, reply = mailin.handle(example, _mail(body=body))
+    assert folder == mailin.PENDING
+    assert reply is not None
+    assert "本受付のものではない" in reply[2]
+
+
+def test_propose_with_stub_llm(example, monkeypatch):
+    """pending 落ちの様式由来メールに、LLM があれば解釈案が付く。"""
+    import email
+    import email.policy
+
+    from amig import llm
+
+    seen = {}
+
+    def fake_complete(prompt):
+        seen["prompt"] = prompt
+        return "お名前: 山田 太郎  # 根拠: 「名まえ 山田太郎です」"
+
+    monkeypatch.setattr(llm, "complete", fake_complete)
+    body = _text(example).replace("お名前: 山田 太郎\n", "名まえ 山田太郎です\n")
+    note = mailin.propose(example, _mail(body=body))
+    assert note is not None
+    msg = email.message_from_bytes(note, policy=email.policy.default)
+    assert msg["Subject"].startswith("【解釈案】")
+    content = msg.get_content()
+    assert "提案であり" in content  # 登録・返信に使われないことの明記
+    assert "山田 太郎" in content
+    # プロンプトには様式の制約と受信本文が入っている
+    assert "お問い合わせ" in seen["prompt"]
+    assert "名まえ 山田太郎です" in seen["prompt"]
+
+
+def test_propose_without_llm_is_none(example, monkeypatch):
+    """LLM 未設定(complete が None)なら何も足さない(フォールバック)。"""
+    from amig import llm
+
+    monkeypatch.setattr(llm, "complete", lambda prompt: None)
+    note = mailin.propose(example, _mail(body=_text(example)))
+    assert note is None
+
+
+def test_propose_non_form_mail_is_none(example, monkeypatch):
+    """様式を特定できないメールには提案しない。"""
+    from amig import llm
+
+    monkeypatch.setattr(llm, "complete", lambda prompt: "何か")
+    assert mailin.propose(example, _mail(body="見積をお願いします")) is None

@@ -67,6 +67,16 @@ def _assemble(value_of: Callable[[str], str | None], site: Site) -> Inquiry:
                 "お手数ですが最新の様式をご利用ください。"
             ]
         )
+    # 識別子の照合(偽様式対策。§11)。無い場合は寛容に受ける
+    # (手書き・旧配布の様式を弾かない)。有って違うときだけ弾く
+    sid = value_of("form_site")
+    if sid is not None and sid != site.name:
+        raise Invalid(
+            [
+                "お手元の様式は本受付のものではないようです。"
+                "ご案内した様式をご利用ください。"
+            ]
+        )
 
     issues: list[str] = []
     staff = _match_staff(value_of("staff"), site.staff)
