@@ -9,8 +9,9 @@
 現在の実装範囲は、移行の入口=公開Web(脱CMS: 静的化・Cloudflare Pages
 配信)、問い合わせ(様式プロファイル+メール受付)、決裁部品(文書属性の
 インデックス・交付物の凍結記録)。業務システム・文書・メール側の部品は
-DESIGN.md §2・§13 と [seminar-kit](https://github.com/aiseed-dev/seminar-kit)
-(実装例)を参照。
+DESIGN.md §2・§13 と、前身キットの要件文書
+[docs/reference/](docs/reference/)（seminar-kit / mfg-kit。汎用化前の
+実装例・凍結）を参照。
 
 - 取り込み(ingest)→ 分類(classify)→ Markdown化(convert)→
   生成(build)→ 配信(publish)のパイプライン
