@@ -1,0 +1,16 @@
+# 検証用 Stalwart。本番とは分ける(仕様 §7)。
+# CalDAV / CardDAV は 0.12 以降なので latest を使う。
+services:
+  stalwart:
+    image: stalwartlabs/stalwart:latest
+    container_name: stalwart-pim-test
+    ports:
+      - "8080:8080"   # 管理画面 + JMAP / CalDAV / CardDAV(検証用なので http)
+      - "1025:25"
+      - "1587:587"
+      - "1993:993"
+    volumes:
+      - stalwart-data:/opt/stalwart
+
+volumes:
+  stalwart-data:

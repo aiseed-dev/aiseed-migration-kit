@@ -1,0 +1,13 @@
+[project]
+name = "stalwart-pim"
+version = "0.1.0"
+description = "Stalwart サーバー専用のメール・予定・連絡先クライアント"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "AGPL-3.0-only" }
+dependencies = [
+  # 1.0 系 API(0.70 で全面刷新)を採用。desktop extra が実行体
+  "flet[desktop]>=0.86,<1.1",
+  "httpx",     # HTTP クライアント(JMAP / CalDAV / CardDAV 共通)
+  "keyring",   # 認証情報の OS キーリング保存
+]
