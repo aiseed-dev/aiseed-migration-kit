@@ -1,0 +1,104 @@
+# 台帳 — 開発用PC/一台目のサーバーのベース一式(DESIGN.md §19)
+#
+# この表が正で、実機はここから作る(先に表、後に線)。使い方:
+#
+#   sudo amig provision provision.yaml --pin     版を固定する(初回だけ)
+#   sudo amig provision provision.yaml           台帳のとおりに入れる
+#   amig provision provision.yaml --check        実機と台帳を突き合わせる
+#
+# **版は導入時に上流で確認して更新する。** 下の版は雛形であり、そのまま
+# 使わない。--pin は指定された URL を実際に取得してハッシュを記録するので、
+# 版が古ければ取得に失敗して止まる(黙って違う物が入ることはない)。
+# 固定後のこのファイルをリポジトリに入れれば、版の記録が承認の記録になる。
+#
+# ローカルAIはここに入れない。NPU/GPU と機微の扱いから、置き場は区画の
+# 金庫側になる(DESIGN.md §7・§16・§19)。
+
+apt:
+  # 土台
+  - ca-certificates
+  - curl
+  - git
+  - python3-venv
+  # データ
+  - postgresql
+  - sqlite3
+  # 机の道具
+  - thunderbird
+  - fonts-noto-cjk
+  - ibus-mozc
+
+venv: /opt/amig/venv
+python:
+  # - aiseed-migration-kit # キット本体(amig)。PyPI 未公開(2026-10-09 時点で 404)。公開までは台帳から外し、clone したリポジトリから `pip install -e .` で入れる
+  - cf-publish             # Cloudflare Pages への配信
+  - fastapi                # 基幹の受け口・窓口
+  - uvicorn
+
+binaries:
+  # 身元(門番は身元だけを持つ。何ができるかは各サーバーが持つ)
+  - name: pocketbase
+    url: https://github.com/pocketbase/pocketbase/releases/download/v0.40.2/pocketbase_0.40.2_linux_amd64.zip
+    archive: zip
+    member: pocketbase
+    dest: /opt/pocketbase/pocketbase
+    sha256: ""            # --pin で記録
+    service:
+      exec: /opt/pocketbase/pocketbase serve --http 127.0.0.1:8090 --dir /var/lib/pocketbase
+      user: pocketbase
+
+  # 版管理・決裁のPR(コードと文書の唯一の正)
+  - name: forgejo
+    url: https://codeberg.org/forgejo/forgejo/releases/download/v16.0.3/forgejo-16.0.3-linux-amd64
+    dest: /opt/forgejo/forgejo
+    sha256: ""
+    service:
+      exec: /opt/forgejo/forgejo web --config /etc/forgejo/app.ini
+      user: forgejo
+
+  # メール(段階1は既存クラウドのままでよい。切替の準備として入れる)
+  - name: stalwart
+    url: https://github.com/stalwartlabs/stalwart/releases/download/v0.16.20/stalwart-x86_64-unknown-linux-gnu.tar.gz
+    archive: tar.gz
+    member: stalwart
+    dest: /opt/stalwart/stalwart
+    sha256: ""
+    service:
+      exec: /opt/stalwart/stalwart --config /etc/stalwart/config.toml
+      user: stalwart
+
+deb:
+  # 文書エンジン(サーバー版)。OnlyOffice の欧州フォーク(AGPL のみ)で、
+  # JS マクロと Docs エンジンの仕組みを互換のまま引き継ぐ。
+  #
+  # ここだけは大きな既製品を借りる。**文書エンジンは自作の対象ではない**
+  # ——ブラウザの描画エンジンと同じ種類のもので、書き直しても検査は届かない。
+  # 借りるのはエンジンだけで、その周り(保管・権限・認証・決裁への接続)は
+  # 共有基盤の上に薄く自作する = 自作文書ホスト + Euro-Office Docs(§2・§13)。
+  #
+  # 版管理する文書(規程・決裁・公開資料)は AsciiDoc + Forgejo が正で、
+  # ここには載せない(§14)。ここが受け持つのは、取引先とやりとりする既存の
+  # Office 文書のブラウザ編集である。
+  #
+  # **配布 URL と版・パッケージ名は導入時に上流で確認して更新する**
+  #
+  # 2026-09-03 時点で euro-office.eu は TLS の証明書が不正で取得できない。
+  # 下の URL は雛形のままであり、**この項目は --pin が必ず失敗する**。
+  # 導入時に配布元を確かめ、URL・版・パッケージ名を書き換えること。それまでは
+  # この項目を外した台帳で入れる(文書エンジンは後から足せる)。
+  - name: euro-office-docs
+    url: https://www.euro-office.eu/download/euro-office-documentserver_2026.6_amd64.deb
+    package: euro-office-documentserver
+    sha256: ""            # --pin で記録
+
+# 大きなアプリを丸ごと載せない。会議・予約・文書サーバー・問い合わせの窓口は、
+# 上の共有基盤(PocketBase・PostgreSQL・Stalwart・FastAPI)の上に薄く自前で作る
+# ——判断の基準は「自作か既存か」ではなく**検査が届くか**である(DESIGN.md §19)。
+#
+# 依存が数千に及ぶアプリは、借りたつもりで検査を手放すことになる。要るのは
+# それらの機能の一部だけで、その一部は共有基盤の上に小さく書ける(§13 の
+# モジュール)。コンテナの仕組み自体は台帳が持っているので、どうしても必要な
+# 組織だけが自分の台帳に足す。
+
+containers: []
+compose: []

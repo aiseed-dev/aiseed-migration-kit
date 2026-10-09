@@ -2,14 +2,16 @@
 
 組織のITを、AI とともに開いた自営スタックへ移行するためのツール一式。
 ねらいは **Microsoft 365 + Azure・業務システム・CMS という三つの閉じた
-世界からの開放**——一つの開いた土台(git・SQL・メール・OnlyOffice・静的公開)に
+世界からの開放**——一つの開いた土台(git・SQL・メール・Euro-Office・静的公開)に
 置き換え、公開標準(Markdown/YAML/SQL/Python)で繋ぐことで、この仕組み
 自体からも出られる形にする。設計は [DESIGN.md](DESIGN.md) が正。
 
 現在の実装範囲は、移行の入口=公開Web(脱CMS: 静的化・Cloudflare Pages
 配信)、問い合わせ(様式プロファイル+メール受付)、決裁部品(文書属性の
-インデックス・交付物の凍結記録)。業務システム・文書・メール側の部品は
-DESIGN.md §2・§13 と、前身キットの要件文書
+インデックス・交付物の凍結記録)、標準 PIM クライアント
+([stalwart-pim/](stalwart-pim/) — Stalwart 専用のメール・予定・連絡先。
+仕様: [docs/stalwart-pim-spec.md](docs/stalwart-pim-spec.md))。
+業務システム・文書側の部品は DESIGN.md §2・§13 と、前身キットの要件文書
 [docs/reference/](docs/reference/)（seminar-kit / mfg-kit。汎用化前の
 実装例・凍結）を参照。
 
@@ -52,12 +54,17 @@ pip install pyasciidoc
 ```bash
 amig new sites/mysite            # サイトの雛形を作る(site.yaml を編集)
 amig ingest sites/mysite ~/data  # 元データ(HTML等)を取り込む
+amig outline sites/mysite        # 現行サイトから会社のいい面を拾い概要を作る
 amig classify sites/mysite       # 記事/一覧に分類(結果は人が直せる)
 amig convert sites/mysite        # 記事を content/*.md へ機械変換(下書き)
 amig build sites/mysite          # dist/ を生成
 amig publish sites/mysite        # Cloudflare Pages へ配信(運用判断で実行)
 ```
 
+- outline は再構築の入口。現行サイトから沿革・製品・認定・写真・数字を拾い、
+  `outline.md`(概要=構成案)と `source/outline.yaml`(拾った事実)を書く。
+  始まりを弱点の指摘ではなく**その会社の価値の再発見**にするための道具で、
+  抽出は決定的(LLM 不要)、磨くのは人と AI の対話(DESIGN.md §18)
 - convert は**既存の .md を上書きしない**(人の仕上げを守る。--force で上書き)
 - publish の認証は環境変数(CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID)
   または ~/.config/cloudflare/pages.env
@@ -66,7 +73,7 @@ amig publish sites/mysite        # Cloudflare Pages へ配信(運用判断で実
 
 ```bash
 amig forms sites/mysite            # 様式(xlsx+記入用テキスト)を forms-out/ へ生成
-amig macro sites/mysite contact    # 様式マクロ(OnlyOffice JS)を出力
+amig macro sites/mysite contact    # 様式マクロ(Euro-Office JS)を出力
 amig ddl sites/mysite              # PostgreSQL DDL(CREATE TABLE)を出力
 amig prompt sites/mysite contact   # pending 解釈用の AI プロンプトを出力
 amig mailin sites/mysite --once    # 受付メールを担当フォルダへ振り分け
@@ -91,7 +98,35 @@ amig mailin sites/mysite --once    # 受付メールを担当フォルダへ振�
   AI は提案まで——登録・自動返信には使われない。未設定なら何も足さない
   (人がそのまま処理する。DESIGN.md §7)
 - 受信の状態=IMAPフォルダ(INBOX=未着手 / staff/<key>=担当へ / pending=未処理)。
-  pending の添付を人が開くときはマクロ無効の環境(OnlyOffice の閲覧等)で
+  pending の添付を人が開くときはマクロ無効の環境(Euro-Office の閲覧等)で
+
+### 導入(開発用PC/一台目のサーバー)
+
+ベース一式(身元・データ・版管理・編集・API・メール・サイト生成)を台帳から
+入れる。**大きな既製アプリは載せない**——判断の基準は「自作か既存か」ではなく
+**検査が届くか**(DESIGN.md §19)。ローカルAIも入れない(置き場は区画の金庫側)。
+
+台帳は用途別に分ける。全員に同じ道具立てを配らない:
+
+| 台帳 | 用途 | 中身 |
+|---|---|---|
+| `provision.yaml` | ソフトウェア開発向け・小さな組織の一台目 | 身元・データ・版管理・API・メール・サイト生成(会議・予約・文書サーバー・問い合わせ窓口は共有基盤の上に薄く自作する。大きな既製アプリは載せない) |
+| `provision-engineer.yaml` | 設計・組込みのエンジニア向け | FreeCAD・KiCad・OpenSCAD・ngspice・sigrok・PlatformIO・OpenOCD 等。重い常駐サービスは外す |
+
+```bash
+sudo amig provision provision.yaml --pin      # 版を実測して台帳に固定(初回だけ)
+sudo amig provision provision.yaml            # 台帳のとおりに入れる
+amig provision provision.yaml --check --receipt 成績書.md   # 実機と台帳を突き合わせる
+```
+
+- 形は許可表(§16)と同じ: **表が正、実機は表から作り、突き合わせて確かめる**
+- 固定していない物は入れない(バイナリは SHA-256、コンテナはダイジェスト、
+  上流の compose 定義もハッシュで固定)。取得物が変わっていれば黙って入らず止まる
+- 成績書は台帳と実機を突き合わせて機械が出す(§19 の納品物)
+- 依存解決・コンテナ実行は自作せず apt / pip / podman を呼ぶだけにする
+- 機器の操作権限(dialout・plugdev 等)も台帳に書いて検査する——無いと
+  「道具は入っているのに実機に書けない箱」を納品することになる
+- **版は導入時に上流で確認して更新する。** 同梱 provision.yaml の版は雛形
 
 ### 決裁部品(文書管理)
 

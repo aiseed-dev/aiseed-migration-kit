@@ -1,0 +1,105 @@
+# 台帳 — 設計・組込みエンジニア向けの作業機(DESIGN.md §19)
+#
+# ソフトウェア開発向け(provision.yaml)との違い:
+#
+#   足す    OSS の CAD・EDA・回路シミュレーション・計測、組込みの書き込み道具
+#   外す    重い常駐サービス(会議・予約・文書サーバー・問い合わせの窓口)
+#
+# 外す理由は、要らないものを入れないという一点である(§13・§18)。会議も
+# 文書サーバーも組織に一台あればよく、設計者の机で常駐させる理由がない。
+# 空いた資源は CAD と加工の計算に回る。
+#
+#   sudo amig provision provision-engineer.yaml --pin    版を固定する(初回だけ)
+#   sudo amig provision provision-engineer.yaml          台帳のとおりに入れる
+#   amig provision provision-engineer.yaml --check       実機と台帳を突き合わせる
+#
+# **版は導入時に上流で確認して更新する。** 下の版は雛形であり、そのまま使わない。
+
+apt:
+  # 土台
+  - ca-certificates
+  - curl
+  - git
+  - git-lfs               # CAD・基板の成果物は大きい。版管理から外さないために入れる
+  - python3-venv
+  - fonts-noto-cjk
+  - ibus-mozc
+
+  # 機械設計(3D・スクリプト・2D・拘束)
+  - freecad               # 3D CAD。板金展開・図面・CAM・FEM をワークベンチで持つ
+  - openscad              # 寸法を式で書く CAD
+  - librecad              # 2D(DXF)
+  - solvespace            # 拘束で解く 2D/3D。機構・リンクの検討に
+
+  # 2D の作図・加工パス(レーザー・銘板・シール・図の清書)
+  - inkscape
+
+  # メッシュ・3Dデータの確認と修復(受け取った STL を通す前に見る)
+  - meshlab
+  - admesh
+  - blender               # 製品写真・カタログの絵、メッシュの確認
+
+  # 解析(構造・熱。性能を数字で確かめる)
+  - calculix-ccx          # FEM ソルバ(FreeCAD の FEM から呼べる)
+  - gmsh                  # メッシュ生成
+  - paraview              # 結果の可視化
+
+  # 電気設計(基板・回路図・回路シミュレーション)
+  - kicad
+  - kicad-libraries
+  - ngspice
+
+  # 計測(ロジックアナライザ・オシロの取り込み)
+  - pulseview
+  - sigrok-cli
+
+  # 組込み(書き込み・デバッグ・シリアル)
+  - gcc-arm-none-eabi
+  - gdb-multiarch
+  - openocd
+  - avrdude
+  - dfu-util
+  - picocom
+
+  # 加工(3Dプリンタへの出力)
+  - prusa-slicer
+
+venv: /opt/amig/venv
+python:
+  # Python で書くパラメトリック CAD。寸法表から部品を起こす・AI に部品を
+  # 書かせる・変更を版管理で追える(データ=宣言的 / 計算=Python。§7)
+  - cadquery
+  - build123d
+  - platformio            # マイコンの統合ビルド(ESP32/STM32/AVR)
+  - esptool               # ESP32 の書き込み
+  - pyserial
+  # - aiseed-migration-kit # 図面と一緒に手順書・公開資料も作る。PyPI 未公開(2026-10-09 時点で 404)。公開までは台帳から外し、clone したリポジトリから `pip install -e .` で入れる
+  - cf-publish
+
+binaries:
+  - name: arduino-cli
+    url: https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_Linux_64bit.tar.gz
+    archive: tar.gz
+    member: arduino-cli
+    dest: /usr/local/bin/arduino-cli
+    sha256: ""            # --pin で記録
+
+# 台帳の外で入れるもの(手順書に残す):
+#
+#   FreeCAD の SheetMetal ワークベンチ(板金の展開図)は、FreeCAD の
+#   アドオン管理から入れる。板金が本業なら最初に入れる一つ。
+#   同じくアドオンの Assembly / CAM も、必要になった段階で足す。
+#   取引先から DWG で図面が来る場合は、変換の道具を別に用意する。
+
+# 重い常駐サービスは入れない(会議・予約・文書サーバー・問い合わせの窓口)。
+# 必要になったら、組織の一台目(provision.yaml)に置いてそちらを使う。
+containers: []
+compose: []
+
+groups:
+  # これが無いと、道具は入っているのに実機に書き込めない箱になる。
+  # 納品前に必ず確かめる(--check の項目に入る)
+  - user: engineer        # 実際に使う人の名前に変える
+    add:
+      - dialout           # USB シリアル(書き込み・ログ)
+      - plugdev           # 書き込み器・計測器

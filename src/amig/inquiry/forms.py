@@ -195,15 +195,15 @@ TEXT_ROW0 = 6  # 送信用テキストの本文が始まる行(A列。数式で�
 def _text_sheet(wb: Workbook, form: FormDef, submit_addr: str) -> None:
     """「送信用テキスト」シート。
 
-    A列: 数式で本文を1行1項目で自動生成(Excel・LibreOffice・OnlyOffice の
+    A列: 数式で本文を1行1項目で自動生成(Excel・LibreOffice・Euro-Office の
     どれでも動く)。行を範囲選択してコピー→メール本文に貼るだけ。
-    C列: 内蔵マクロ(OnlyOffice 専用)が一括コピー用に1セルへまとめる補助。
+    C列: 内蔵マクロ(Euro-Office / OnlyOffice 専用)が一括コピー用に1セルへまとめる補助。
     """
     ws = wb.create_sheet(TEXT_SHEET)
     ws["A1"] = "送信用テキスト(メール本文に貼り付けて送る)"
     ws["A1"].font = Font(bold=True)
     ws["A2"] = (
-        "おすすめ: 無料の OnlyOffice で開き、マクロ「送信用テキスト」を"
+        "おすすめ: 無料の Euro-Office(または OnlyOffice)で開き、マクロ「送信用テキスト」を"
         "実行すると、未記入のチェック付きで C 列に本文がまとまります。"
         f"コピーして {submit_addr} へメール本文として送信してください。"
     )
@@ -226,10 +226,10 @@ def _text_sheet(wb: Workbook, form: FormDef, submit_addr: str) -> None:
 
 
 def macro_js(site: Site, form: FormDef) -> str:
-    """様式内蔵マクロ(OnlyOffice JavaScript)を様式定義から生成する。
+    """様式内蔵マクロ(Euro-Office JavaScript)を様式定義から生成する。
 
     本文の生成自体は A 列の数式が担う(全表計算ソフト共通)。マクロは
-    OnlyOffice 利用者向けの補助で、未記入チェックのうえ C 列の1セルに
+    Euro-Office / OnlyOffice 利用者向けの補助で、未記入チェックのうえ C 列の1セルに
     本文をまとめて一括コピーしやすくする。
     出力: `amig macro <site> <form>`。チェック定義はサーバー側の検証
     (parse)と同じ様式プロファイルから生成されるため、様式を変えたら再生成する。
@@ -241,7 +241,7 @@ def macro_js(site: Site, form: FormDef) -> str:
         f'["{f.label}", "{n[f"f_{f.key}"]}"]' for f in form.fields if f.required
     )
     return f"""// 様式マクロ({form.label}): 未記入チェックのうえ、送信用テキストを
-// 「{TEXT_SHEET}」シートに書き出す。OnlyOffice(Desktop / Docs)専用。
+// 「{TEXT_SHEET}」シートに書き出す。Euro-Office / OnlyOffice(Desktop / Docs)専用。
 // このファイルは自動生成(amig macro)——手で直さず、様式プロファイル(.adoc)を直して再生成する
 // チェック定義はサーバー側の検証(parse)と同じ様式プロファイルから生成される
 (function () {{

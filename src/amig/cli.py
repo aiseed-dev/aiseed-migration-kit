@@ -1,18 +1,20 @@
 """amig コマンド(パイプラインの入口)。
 
-    amig new sites/<name>            サイトの雛形を作る
-    amig ingest <site> <入力...>     元データを source/raw/ へ取り込む
-    amig classify <site>             記事/一覧に分類(classified.yaml)
-    amig convert <site> [--force]    記事を content/*.md へ機械変換
-    amig build <site>                dist/ を生成
-    amig publish <site> [--dry-run]  Cloudflare Pages へ配信
-    amig forms <site>                申込様式(xlsx+記入テキスト)を forms-out/ へ生成
-    amig macro <site> <form>         様式マクロ(OnlyOffice JS)を出力
-    amig ddl <site> [<form>]         PostgreSQL DDL(CREATE TABLE)を出力
-    amig prompt <site> <form>        pending 解釈用の AI プロンプトを出力
-    amig mailin <site> [--once]      受付メールの振り分け(IMAP)
-    amig docindex <dir>              決裁文書の属性インデックス(SQL)を出力
-    amig freeze <file> [--source]    交付物の凍結記録(SHA-256+生成元)を作成
+amig new sites/<name>            サイトの雛形を作る
+amig ingest <site> <入力...>     元データを source/raw/ へ取り込む
+amig outline <site>              現行サイトから会社のいい面を拾い概要を作る
+amig classify <site>             記事/一覧に分類(classified.yaml)
+amig convert <site> [--force]    記事を content/*.md へ機械変換
+amig build <site>                dist/ を生成
+amig publish <site> [--dry-run]  Cloudflare Pages へ配信
+amig forms <site>                申込様式(xlsx+記入テキスト)を forms-out/ へ生成
+amig macro <site> <form>         様式マクロ(Euro-Office JS)を出力
+amig ddl <site> [<form>]         PostgreSQL DDL(CREATE TABLE)を出力
+amig prompt <site> <form>        pending 解釈用の AI プロンプトを出力
+amig mailin <site> [--once]      受付メールの振り分け(IMAP)
+amig docindex <dir>              決裁文書の属性インデックス(SQL)を出力
+amig freeze <file> [--source]    交付物の凍結記録(SHA-256+生成元)を作成
+amig provision <台帳> [--check]  ベース一式を台帳のとおりに入れる(§19)
 """
 
 import argparse
@@ -24,6 +26,7 @@ from amig import classify as classify_mod
 from amig import convert as convert_mod
 from amig import decision as decision_mod
 from amig import ingest as ingest_mod
+from amig import provision as provision_mod
 from amig import publish as publish_mod
 from amig import site as site_mod
 
@@ -61,6 +64,11 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("site")
     sp.add_argument("inputs", nargs="+")
 
+    sp = sub.add_parser(
+        "outline", help="現行サイトから会社のいい面を拾い、概要(構成案)を作る"
+    )
+    sp.add_argument("site")
+
     sp = sub.add_parser("classify", help="記事/一覧に分類する")
     sp.add_argument("site")
 
@@ -81,7 +89,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     sp.add_argument("site")
 
-    sp = sub.add_parser("macro", help="様式マクロ(OnlyOffice JS)を出力する")
+    sp = sub.add_parser("macro", help="様式マクロ(Euro-Office JS)を出力する")
     sp.add_argument("site")
     sp.add_argument("form")
 
@@ -89,9 +97,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("site")
     sp.add_argument("form", nargs="?", help="省略時は全様式")
 
-    sp = sub.add_parser(
-        "prompt", help="pending 解釈用の AI プロンプトを出力する(§7)"
-    )
+    sp = sub.add_parser("prompt", help="pending 解釈用の AI プロンプトを出力する(§7)")
     sp.add_argument("site")
     sp.add_argument("form")
 
@@ -104,11 +110,18 @@ def main(argv: list[str] | None = None) -> None:
     )
     sp.add_argument("dir")
 
-    sp = sub.add_parser(
-        "freeze", help="交付物の凍結記録(<file>.hash.yaml)を作成する"
-    )
+    sp = sub.add_parser("freeze", help="交付物の凍結記録(<file>.hash.yaml)を作成する")
     sp.add_argument("file")
     sp.add_argument("--source", help="生成元の決裁文書(.adoc)")
+
+    sp = sub.add_parser(
+        "provision", help="台帳のとおりにベース一式を入れる/確かめる(§19)"
+    )
+    sp.add_argument("manifest", help="台帳(provision.yaml)")
+    sp.add_argument("--check", action="store_true", help="実機と台帳を突き合わせる")
+    sp.add_argument("--pin", action="store_true", help="版を実測して台帳に記録する")
+    sp.add_argument("--dry-run", action="store_true", help="実行せず手順だけ示す")
+    sp.add_argument("--receipt", help="成績書の書き出し先(.md)")
 
     args = p.parse_args(argv)
     try:
@@ -118,6 +131,7 @@ def main(argv: list[str] | None = None) -> None:
         build_mod.BuildError,
         publish_mod.PublishError,
         decision_mod.DecisionError,
+        provision_mod.ProvisionError,
     ) as e:
         print(f"エラー: {e}", file=sys.stderr)
         raise SystemExit(1) from None
@@ -151,14 +165,31 @@ def _run(args: argparse.Namespace) -> None:
         print(f"凍結記録を作成: {out}")
         return
 
+    # 導入(§19)はサイト設定に依存しない
+    if args.cmd == "provision":
+        _provision(args)
+        return
+
     site = site_mod.load(args.site)
 
     if args.cmd == "ingest":
         n = ingest_mod.ingest(site, [Path(x) for x in args.inputs])
         print(f"取り込み {n} 件 → {site.raw}")
+    elif args.cmd == "outline":
+        from amig import outline as outline_mod
+
+        out = outline_mod.outline(site)
+        yaml_path, md_path = outline_mod.write(site, out)
+        print(
+            f"概要を作成 → {md_path}(事実: {yaml_path})\n"
+            f"  ページ {out.pages} / 沿革 {len(out.history)} / 製品 {len(out.products)}"
+            f" / 裏付け {len(out.proofs)} / 写真 {len(out.photos)}"
+        )
     elif args.cmd == "classify":
         result = classify_mod.classify(site)
-        print(f"分類 {classify_mod.counts(result)} → {site.source / '(classified.yaml)'}")
+        print(
+            f"分類 {classify_mod.counts(result)} → {site.source / '(classified.yaml)'}"
+        )
     elif args.cmd == "convert":
         written, skipped = convert_mod.convert(site, force=args.force)
         note = "(--force で上書き)" if skipped and not args.force else ""
@@ -189,13 +220,44 @@ def _run(args: argparse.Namespace) -> None:
         mailin.run(site, once=args.once)
 
 
+def _provision(args: argparse.Namespace) -> None:
+    """台帳から導入する/確かめる(§19)。"""
+    from amig import provision as prov
+
+    manifest = prov.load(args.manifest)
+    runner = prov.Runner(dry_run=args.dry_run)
+    p = prov.Provisioner(manifest, runner)
+    if args.check:
+        mode, results = "照合(--check)", p.check()
+    elif args.pin:
+        mode = "版の固定(--pin)"
+        if not args.dry_run:
+            prov.require_root(mode)
+        results = p.pin()
+    else:
+        mode = "導入"
+        if not args.dry_run:
+            prov.require_root(mode)
+        results = p.apply()
+    text = prov.receipt(manifest, results, mode)
+    if args.receipt:
+        Path(args.receipt).write_text(text, encoding="utf-8")
+        print(f"成績書を書き出しました: {args.receipt}")
+    else:
+        print(text, end="")
+    if not all(r.ok for r in results):
+        raise SystemExit(1)
+
+
 def _forms(site: site_mod.Site) -> None:
     from amig.inquiry import derive
     from amig.inquiry import forms as forms_mod
 
     addr = str((site.cfg.get("inquiry") or {}).get("address") or "")
     if not addr:
-        raise site_mod.SiteError("site.yaml の inquiry.address(受付アドレス)が未設定です")
+        raise site_mod.SiteError(
+            "site.yaml の inquiry.address(受付アドレス)が未設定です"
+        )
     if not site.staff:
         raise site_mod.SiteError("site.yaml の inquiry.staff(担当)が未設定です")
     if not site.forms:
